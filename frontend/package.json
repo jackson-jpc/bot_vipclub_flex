@@ -1,7 +1,7 @@
 {
   "name": "frontend",
   "version": "0.1.0",
-  "versionSystem": "v5.5.0",
+  "versionSystem": "v6.0.0",
   "nomeEmpresa": "PLW Design",
   "private": true,
   "dependencies": {
@@ -21,23 +21,23 @@
     "@testing-library/react": "^11.0.4",
     "@testing-library/user-event": "^12.1.7",
     "async-mutex": "^0.5.0",
-    "axios": "^0.21.1",
+    "axios": "^1.5.0",
     "bootstrap": "^5.2.3",
     "chart.js": "^3.9.1",
     "chartjs-plugin-datalabels": "^2.1.0",
     "compressorjs": "^1.2.1",
     "context": "^4.0.0",
-    "date-fns": "^2.16.1",
+    "date-fns": "^2.30.0",
     "emoji-mart": "^3.0.0",
     "express": "^4.19.2",
-    "formik": "^2.2.0",
+    "formik": "^2.4.0",
     "formik-material-ui": "^3.0.1",
     "gn-api-sdk-node": "^3.0.2",
     "html2pdf.js": "^0.10.2",
     "i18next": "^19.8.2",
     "i18next-browser-languagedetector": "^6.0.1",
     "jsonwebtoken": "^9.0.2",
-    "markdown-to-jsx": "^7.1.0",
+    "markdown-to-jsx": "^7.7.4",
     "material-ui-color": "^1.2.0",
     "material-ui-nested-menu-item": "^1.0.2",
     "mic-recorder-to-mp3": "^2.2.2",
@@ -45,7 +45,7 @@
     "path-browserify": "^1.0.1",
     "qrcode.react": "^1.0.0",
     "query-string": "^7.0.0",
-    "react": "^17.0.2",
+    "react": "^17.0.1",
     "react-big-calendar": "^1.8.7",
     "react-bootstrap": "^2.7.0",
     "react-chartjs-2": "^4.3.1",
@@ -53,7 +53,7 @@
     "react-copy-to-clipboard": "^5.1.0",
     "react-csv": "^2.2.2",
     "react-currency-format": "^1.1.0",
-    "react-dom": "^17.0.2",
+    "react-dom": "^17.0.1",
     "react-feather": "^2.0.10",
     "react-icons": "^4.4.0",
     "react-input-mask": "^2.0.4",
@@ -63,7 +63,7 @@
     "react-qr-code": "^2.0.7",
     "react-query": "^3.39.3",
     "react-router-dom": "^5.2.0",
-    "react-scripts": "^5.0.1",
+    "react-scripts": "5.0.1",
     "react-text-mask": "^5.5.0",
     "react-to-print": "^3.0.2",
     "react-toastify": "9.0.0",
@@ -77,14 +77,19 @@
     "uuid": "^8.3.2",
     "vcard-parser": "^1.0.0",
     "xlsx": "^0.18.5",
-    "yup": "^0.32.8"
+    "yup": "^0.32.8",
+    "compression": "^1.7.4",
+    "helmet": "^6.1.5"
   },
   "scripts": {
-    "start": "export NODE_OPTIONS=\"--max-old-space-size=8192\" && react-scripts start",
-    "build": "export NODE_OPTIONS=\"--max-old-space-size=8192\" && NODE_OPTIONS=--openssl-legacy-provider GENERATE_SOURCEMAP=false react-scripts build",
+    "start": "react-scripts start",
+    "build": "GENERATE_SOURCEMAP=false INLINE_RUNTIME_CHUNK=false react-scripts build",
+    "build:analyze": "source-map-explorer 'build/static/js/*.js'",
+    "build:prod": "npm run build && npm run build:analyze",
     "builddev": "export NODE_OPTIONS=\"--max-old-space-size=8192\" && react-scripts build",
     "test": "export NODE_OPTIONS=\"--max-old-space-size=8192\" && react-scripts test",
-    "eject": "export NODE_OPTIONS=\"--max-old-space-size=8192\" && react-scripts eject"
+    "eject": "export NODE_OPTIONS=\"--max-old-space-size=8192\" && react-scripts eject",
+    "serve": "node server.js"
   },
   "eslintConfig": {
     "extends": "react-app"
@@ -102,6 +107,11 @@
     ]
   },
   "devDependencies": {
-    "@babel/plugin-proposal-private-property-in-object": "^7.21.11"
+    "@babel/plugin-proposal-private-property-in-object": "^7.21.11",
+    "cache-loader": "^4.1.0",
+    "hard-source-webpack-plugin": "^0.13.1",
+    "react-refresh": "^0.14.0",
+    "source-map-explorer": "^2.5.3",
+    "thread-loader": "^3.0.4"
   }
 }

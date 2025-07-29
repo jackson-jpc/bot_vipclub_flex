@@ -52,7 +52,6 @@ const processAudioFile = async (audio: string, companyId: string): Promise<strin
   });
 };
 
-
 export const getMessageOptions = async (
   fileName: string,
   pathMedia: string,
@@ -73,16 +72,15 @@ export const getMessageOptions = async (
         video: fs.readFileSync(pathMedia),
         caption: body ? body : null,
         fileName: fileName
-        // gifPlayback: true
       };
     } else if (typeMessage === "audio") {
-      const typeAudio = true; //fileName.includes("audio-record-site");
+      const typeAudio = true;
       const convert = await processAudio(pathMedia, companyId);
       if (typeAudio) {
         options = {
           audio: fs.readFileSync(convert),
-		  mimetype: "audio/ogg; codecs=opus",
-		  ptt: true, // Certifique-se de que PTT está definido corretamente
+          mimetype: "audio/ogg; codecs=opus",
+          ptt: true,
         };
       } else {
         options = {
@@ -91,7 +89,7 @@ export const getMessageOptions = async (
           ptt: true
         };
       }
-    } else if (typeMessage === "document") {
+    } else if (typeMessage === "document" || fileName.endsWith('.psd')) {
       options = {
         document: fs.readFileSync(pathMedia),
         caption: body ? body : null,
@@ -120,7 +118,6 @@ export const getMessageOptions = async (
   }
 };
 
-
 const SendWhatsAppMedia = async ({
   media,
   ticket,
@@ -129,54 +126,85 @@ const SendWhatsAppMedia = async ({
 }: Request): Promise<WAMessage> => {
   try {
     const wbot = await GetTicketWbot(ticket);
-	const companyId = ticket.companyId.toString();
+    const companyId = ticket.companyId.toString();
 
     const pathMedia = media.path;
-    const typeMessage = media.mimetype.split("/")[0];
+    const mimeType = media.mimetype;
+    const typeMessage = mimeType.split("/")[0];
+    const fileName = media.originalname.replace('/', '-');
     let options: AnyMessageContent;
-    const bodyMessage = formatBody(body, ticket.contact)
+    const bodyMessage = formatBody(body, ticket.contact);
 
-    if (typeMessage === "video") {
+    // Lista de tipos MIME de vídeo comuns
+    const videoMimeTypes = [
+      'video/mp4',
+      'video/3gpp',
+      'video/quicktime',
+      'video/x-msvideo',
+      'video/x-ms-wmv',
+      'video/x-matroska',
+      'video/webm',
+      'video/ogg'
+    ];
+
+    // Lista de extensões que devem ser tratadas como documento
+    const documentExtensions = ['.psd', '.ai', '.eps', '.indd', '.xd', '.sketch'];
+
+    // Verifica se é um arquivo PSD ou similar (deve ser tratado como documento)
+    const shouldBeDocument = documentExtensions.some(ext => fileName.toLowerCase().endsWith(ext));
+
+    if (shouldBeDocument) {
+      options = {
+        document: fs.readFileSync(pathMedia),
+        caption: bodyMessage,
+        fileName: fileName,
+        mimetype: mimeType
+      };
+    }
+    // Verifica se é um vídeo (incluindo vários formatos)
+    else if (typeMessage === "video" || videoMimeTypes.includes(mimeType)) {
       options = {
         video: fs.readFileSync(pathMedia),
-        caption: body,
-        fileName: media.originalname.replace('/', '-')
-        // gifPlayback: true
+        caption: bodyMessage,
+        fileName: fileName,
+        mimetype: mimeType
       };
     } else if (typeMessage === "audio") {
-      const typeAudio = media.originalname.includes("audio-record-site");
-      if (typeAudio) {
-        const convert = await processAudio(media.path, companyId);
+      // Verifica se o arquivo já é OGG
+      if (mimeType === "audio/ogg") {
         options = {
-          audio: fs.readFileSync(convert),
-          mimetype: typeAudio ? "audio/mp4" : media.mimetype,
+          audio: fs.readFileSync(pathMedia),
+          mimetype: "audio/ogg; codecs=opus",
           ptt: true
         };
       } else {
-        const convert = await processAudioFile(media.path, companyId);
+        // Converte para OGG se não for
+        const convert = await processAudio(pathMedia, companyId);
         options = {
           audio: fs.readFileSync(convert),
-          mimetype: typeAudio ? "audio/mp4" : media.mimetype
+          mimetype: "audio/ogg; codecs=opus",
+          ptt: true
         };
       }
-    } else if (typeMessage === "document" || typeMessage === "text") {
+    } else if (typeMessage === "document" || mimeType === "application/pdf") {
       options = {
         document: fs.readFileSync(pathMedia),
-        caption: body,
-        fileName: media.originalname.replace('/', '-'),
-        mimetype: media.mimetype
+        caption: bodyMessage,
+        fileName: fileName,
+        mimetype: mimeType
       };
-    } else if (typeMessage === "application") {
-      options = {
-        document: fs.readFileSync(pathMedia),
-        caption: body,
-        fileName: media.originalname.replace('/', '-'),
-        mimetype: media.mimetype
-      };
-    } else {
+    } else if (typeMessage === "image") {
       options = {
         image: fs.readFileSync(pathMedia),
-        caption: body
+        caption: bodyMessage
+      };
+    } else {
+      // Caso o tipo de mídia não seja reconhecido, trata como documento
+      options = {
+        document: fs.readFileSync(pathMedia),
+        caption: bodyMessage,
+        fileName: fileName,
+        mimetype: mimeType
       };
     }
 
@@ -198,5 +226,3 @@ const SendWhatsAppMedia = async ({
 };
 
 export default SendWhatsAppMedia;
-
-

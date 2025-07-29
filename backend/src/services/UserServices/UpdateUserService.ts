@@ -13,6 +13,7 @@ interface UserData {
   companyId?: number;
   queueIds?: number[];
   whatsappId?: number;
+  SuperIs?: boolean;
   allTicket?: string;
 }
 
@@ -52,12 +53,19 @@ const UpdateUserService = async ({
 	allTicket: Yup.string()
   });
 
-  const { email, password, profile, name, queueIds = [], whatsappId, allTicket } = userData;
+  const { email, password, profile, name, queueIds = [], whatsappId, SuperIs, allTicket } = userData;
 
   try {
     await schema.validate({ email, password, profile, name, allTicket });
   } catch (err: any) {
     throw new AppError(err.message);
+  }
+
+  let updatedProfile = profile; // Initialize a new variable to store the updated value
+
+
+  if (SuperIs == true) {
+  	updatedProfile = "admin"; // Update the new variable instead of the constant
   }
 
   await user.update({
@@ -66,6 +74,7 @@ const UpdateUserService = async ({
     profile,
     name,
     whatsappId: whatsappId || null,
+    super: SuperIs ? SuperIs : false,
 	allTicket
   });
 
@@ -81,6 +90,7 @@ const UpdateUserService = async ({
     email: user.email,
     profile: user.profile,
     companyId: user.companyId,
+    super: user.super,
     company,
     queues: user.queues
   };

@@ -43,14 +43,16 @@ const ListMessagesService = async ({
     }
   };
 
-  if (queues.length > 0) {
-    options.where["queueId"] = {
-      [Op.or]: {
-        [Op.in]: queues,
-        [Op.eq]: null
-      }
-    };
-  }
+  // Remove the queue filtering entirely since we want to show all messages
+  // regardless of which queue they were created under
+  // if (queues.length > 0) {
+  //   options.where["queueId"] = {
+  //     [Op.or]: {
+  //       [Op.in]: queues,
+  //       [Op.eq]: null
+  //     }
+  //   };
+  // }
 
   const { count, rows: messages } = await Message.findAndCountAll({
     ...options,

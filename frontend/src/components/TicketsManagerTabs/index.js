@@ -101,7 +101,7 @@ const useStyles = makeStyles((theme) => ({
   snackbar: {
     display: "flex",
     justifyContent: "space-between",
-    backgroundColor: theme.palette.primary.main,
+    backgroundColor: theme.palette.secondary.main,
     color: "white",
     borderRadius: 30,
     [theme.breakpoints.down("sm")]: {

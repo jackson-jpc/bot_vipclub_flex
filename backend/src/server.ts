@@ -8,22 +8,25 @@ import { startQueueProcess } from "./queues";
 import { TransferTicketQueue } from "./wbotTransferTicketQueue";
 import cron from "node-cron";
 
+
 const server = app.listen(process.env.PORT, async () => {
-  try {
-    const companies = await Company.findAll();
-    const sessionPromises = [];
-
-    for (const c of companies) {
-      sessionPromises.push(StartAllWhatsAppsSessions(c.id));
+  const companies = await Company.findAll();
+  const allPromises: any[] = [];
+  companies.map(async c => {
+  
+  	if(c.status === true){  
+    	const promise = StartAllWhatsAppsSessions(c.id);
+    	allPromises.push(promise);
+    }else{
+    	logger.info(`Empresa INATIVA: ${c.id} | ${c.name}`);
     }
+  
+  });
 
-    await Promise.all(sessionPromises);
+  Promise.all(allPromises).then(() => {
     startQueueProcess();
-    logger.info(`Server started on port: ${process.env.PORT}`);
-  } catch (error) {
-    logger.error("Error starting server:", error);
-    process.exit(1);
-  }
+  });
+  logger.info(`Server started on port: ${process.env.PORT}`);
 });
 
 process.on("uncaughtException", err => {
@@ -42,7 +45,7 @@ process.on("unhandledRejection", (reason, p) => {
 });
 
 
-cron.schedule("* * * * *", async () => {
+cron.schedule("*/5 * * * *", async () => {  // De 1 minuto para 5 minutos
   try {
     logger.info(`Serviço de transferência de tickets iniciado`);
     await TransferTicketQueue();
@@ -50,6 +53,8 @@ cron.schedule("* * * * *", async () => {
     logger.error("Error in cron job:", error);
   }
 });
+
+
 
 initIO(server);
 

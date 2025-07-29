@@ -3,6 +3,7 @@ import React, { useState, useEffect, useContext } from "react";
 import * as Yup from "yup";
 import { Formik, Form, Field } from "formik";
 import { toast } from "react-toastify";
+import useAuth from "../../hooks/useAuth.js";
 
 import {
 	Button,
@@ -34,6 +35,7 @@ import QueueSelect from "../QueueSelect";
 import { AuthContext } from "../../context/Auth/AuthContext";
 import { Can } from "../Can";
 import useWhatsApps from "../../hooks/useWhatsApps";
+import OnlyForSuperUser from "../../components/OnlyForSuperUser";
 
 const useStyles = makeStyles(theme => ({
 	root: {
@@ -77,11 +79,15 @@ const UserSchema = Yup.object().shape({
 const UserModal = ({ open, onClose, userId }) => {
 	const classes = useStyles();
 
+	const [currentUser, setCurrentUser] = useState({});
+    const { getCurrentUserInfo } = useAuth();
+
 	const initialState = {
 		name: "",
 		email: "",
 		password: "",
 		profile: "user",
+		super:"",
 		allTicket: "desabled"
 	};
 
@@ -105,6 +111,10 @@ const UserModal = ({ open, onClose, userId }) => {
 				const userQueueIds = data.queues?.map(queue => queue.id);
 				setSelectedQueueIds(userQueueIds);
 				setWhatsappId(data.whatsappId ? data.whatsappId : '');
+            
+                const userS = await getCurrentUserInfo();
+    			setCurrentUser(userS);
+            
 			} catch (err) {
 				toastError(err);
 			}
@@ -112,6 +122,7 @@ const UserModal = ({ open, onClose, userId }) => {
 
 		fetchUser();
 	}, [userId, open]);
+
 
 	const handleClose = () => {
 		onClose();
@@ -238,6 +249,47 @@ const UserModal = ({ open, onClose, userId }) => {
 										/>
 									</FormControl>
 								</div>
+								{userId && (
+                             
+                             <FormControl variant="outlined" margin="dense" className={classes.maxWidth} fullWidth>                                   
+                                    
+                                <OnlyForSuperUser
+            						user={currentUser}
+            						yes={() => (
+              						<>
+                                    
+                                    
+                                    				<InputLabel id="SuperIs-selection-input-label">
+														{i18n.t("userModal.form.SuperIs")}
+													</InputLabel>
+
+													<Field
+														as={Select}
+														label={i18n.t("userModal.form.SuperIs")}
+														name="SuperIs"
+														labelId="SuperIs-selection-label"
+														id="SuperIs"                                                        
+														required
+													>
+                                                    	<MenuItem value="disabled" disabled>
+                                        				<em>Permissão SUPER ADMIN?</em>
+														</MenuItem>
+														<MenuItem value="0">NÃO</MenuItem>
+														<MenuItem value="1">SIM</MenuItem>
+													</Field>
+                                    
+                                    
+                                    
+                                    
+                                    
+                                    
+                                    
+                                    </>
+            						)}
+          						/>
+                                
+                                </FormControl>
+                             )}
 								<Can
 									role={loggedInUser.profile}
 									perform="user-modal:editQueues"

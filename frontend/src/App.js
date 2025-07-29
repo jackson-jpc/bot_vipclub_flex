@@ -57,6 +57,7 @@ const App = () => {
             palette: {
                 type: mode,
                 primary: { main: mode === "light" ? "#2DDD7F" : "#FFFFFF" },
+                quicktags: { main: mode === "light" ? "#2DDD7F" : "#2DDD7F" },
 				sair: { main: mode === "light" ? "#2DDD7F" : "#333" },
 				vcard: { main: mode === "light" ? "#2DDD7F" : "#666" },
                 textPrimary: mode === "light" ? "#2DDD7F" : "#FFFFFF",
@@ -64,6 +65,7 @@ const App = () => {
                 dark: { main: mode === "light" ? "#333333" : "#F3F3F3" },
                 light: { main: mode === "light" ? "#F3F3F3" : "#333333" },
                 tabHeaderBackground: mode === "light" ? "#EEE" : "#666",
+                ticketlist: mode === "light" ? "#fafafa" : "#333",
                 optionsBackground: mode === "light" ? "#fafafa" : "#333",
 				options: mode === "light" ? "#fafafa" : "#666",
 				fontecor: mode === "light" ? "#128c7e" : "#fff",

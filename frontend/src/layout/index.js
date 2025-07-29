@@ -19,25 +19,21 @@ import {
 import MenuIcon from "@material-ui/icons/Menu";
 import ChevronLeftIcon from "@material-ui/icons/ChevronLeft";
 import AccountCircle from "@material-ui/icons/AccountCircle";
-import CachedIcon from "@material-ui/icons/Cached";
+import LanguageIcon from "@material-ui/icons/Language";
 
 import MainListItems from "./MainListItems";
 import NotificationsPopOver from "../components/NotificationsPopOver";
 import NotificationsVolume from "../components/NotificationsVolume";
 import UserModal from "../components/UserModal";
 import { AuthContext } from "../context/Auth/AuthContext";
+import UserLanguageSelector from "../components/UserLanguageSelector";
 import BackdropLoading from "../components/BackdropLoading";
-import DarkMode from "../components/DarkMode";
 import { i18n } from "../translate/i18n";
 import toastError from "../errors/toastError";
 import AnnouncementsPopover from "../components/AnnouncementsPopover";
-
-//import logo from "../assets/logo.png";
 import { SocketContext } from "../context/Socket/SocketContext";
 import ChatPopover from "../pages/Chat/ChatPopover";
-
 import { useDate } from "../hooks/useDate";
-
 import ColorModeContext from "../layout/themeContext";
 import Brightness4Icon from '@material-ui/icons/Brightness4';
 import Brightness7Icon from '@material-ui/icons/Brightness7';
@@ -54,8 +50,7 @@ const useStyles = makeStyles((theme) => ({
     backgroundColor: theme.palette.fancyBackground,
     '& .MuiButton-outlinedPrimary': {
       color: theme.mode === 'light' ? '#FFF' : '#FFF',
-	  backgroundColor: theme.mode === 'light' ? '#2DDD7F' : '#1c1c1c',
-      //border: theme.mode === 'light' ? '1px solid rgba(0 124 102)' : '1px solid rgba(255, 255, 255, 0.5)',
+      backgroundColor: theme.mode === 'light' ? '#2DDD7F' : '#1c1c1c',
     },
     '& .MuiTab-textColorPrimary.Mui-selected': {
       color: theme.mode === 'light' ? '#2DDD7F' : '#FFF',
@@ -65,7 +60,7 @@ const useStyles = makeStyles((theme) => ({
     width: "100%",
   },
   toolbar: {
-    paddingRight: 24, // keep right padding when drawer closed
+    paddingRight: 24,
     color: theme.palette.dark.main,
     background: theme.palette.barraSuperior,
   },
@@ -141,7 +136,6 @@ const useStyles = makeStyles((theme) => ({
   content: {
     flex: 1,
     overflow: "auto",
-
   },
   container: {
     paddingTop: theme.spacing(4),
@@ -159,23 +153,18 @@ const useStyles = makeStyles((theme) => ({
     overflowY: "scroll",
     ...theme.scrollbarStyles,
   },
-  NotificationsPopOver: {
-    // color: theme.barraSuperior.secondary.main,
+  flagIcon: {
+    width: 24,
+    height: 16,
+    marginRight: 8,
   },
-  logo: {
-    width: "80%",
-    height: "auto",
-    maxWidth: 180,
-    [theme.breakpoints.down("sm")]: {
-      width: "auto",
-      height: "80%",
-      maxWidth: 180,
-    },
-    logo: theme.logo
+  languageMenuItem: {
+    display: 'flex',
+    alignItems: 'center',
   },
 }));
 
-const LoggedInLayout = ({ children, themeToggle }) => {
+const LoggedInLayout = ({ children }) => {
   const classes = useStyles();
   const [userModalOpen, setUserModalOpen] = useState(false);
   const [anchorEl, setAnchorEl] = useState(null);
@@ -183,7 +172,6 @@ const LoggedInLayout = ({ children, themeToggle }) => {
   const { handleLogout, loading } = useContext(AuthContext);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [drawerVariant, setDrawerVariant] = useState("permanent");
-  // const [dueDate, setDueDate] = useState("");
   const { user } = useContext(AuthContext);
 
   const theme = useTheme();
@@ -198,58 +186,8 @@ const LoggedInLayout = ({ children, themeToggle }) => {
   const initialLogo = theme.palette.type === 'light' ? logoLight : logoDark;
   const [logoImg, setLogoImg] = useState(initialLogo);
 
-
   const [volume, setVolume] = useState(localStorage.getItem("volume") || 1);
-
   const { dateToClient } = useDate();
-
-
-  //################### CODIGOS DE TESTE #########################################
-  // useEffect(() => {
-  //   navigator.getBattery().then((battery) => {
-  //     console.log(`Battery Charging: ${battery.charging}`);
-  //     console.log(`Battery Level: ${battery.level * 100}%`);
-  //     console.log(`Charging Time: ${battery.chargingTime}`);
-  //     console.log(`Discharging Time: ${battery.dischargingTime}`);
-  //   })
-  // }, []);
-
-  // useEffect(() => {
-  //   const geoLocation = navigator.geolocation
-
-  //   geoLocation.getCurrentPosition((position) => {
-  //     let lat = position.coords.latitude;
-  //     let long = position.coords.longitude;
-
-  //     console.log('latitude: ', lat)
-  //     console.log('longitude: ', long)
-  //   })
-  // }, []);
-
-  // useEffect(() => {
-  //   const nucleos = window.navigator.hardwareConcurrency;
-
-  //   console.log('Nucleos: ', nucleos)
-  // }, []);
-
-  // useEffect(() => {
-  //   console.log('userAgent', navigator.userAgent)
-  //   if (
-  //     navigator.userAgent.match(/Android/i)
-  //     || navigator.userAgent.match(/webOS/i)
-  //     || navigator.userAgent.match(/iPhone/i)
-  //     || navigator.userAgent.match(/iPad/i)
-  //     || navigator.userAgent.match(/iPod/i)
-  //     || navigator.userAgent.match(/BlackBerry/i)
-  //     || navigator.userAgent.match(/Windows Phone/i)
-  //   ) {
-  //     console.log('é mobile ', true) //celular
-  //   }
-  //   else {
-  //     console.log('não é mobile: ', false) //nao é celular
-  //   }
-  // }, []);
-  //##############################################################################
 
   const socketManager = useContext(SocketContext);
 
@@ -320,10 +258,6 @@ const LoggedInLayout = ({ children, themeToggle }) => {
     }
   };
 
-  const handleRefreshPage = () => {
-    window.location.reload(false);
-  }
-
   const handleMenuItemClick = () => {
     const { innerWidth: width } = window;
     if (width <= 600) {
@@ -332,7 +266,6 @@ const LoggedInLayout = ({ children, themeToggle }) => {
   };
 
   useEffect(() => {
-    // Atualiza o logo sempre que o modo do tema muda
     setLogoImg(theme.palette.type === 'light' ? logoLight : logoDark);
   }, [theme.palette.type]);
 
@@ -344,7 +277,6 @@ const LoggedInLayout = ({ children, themeToggle }) => {
   if (loading) {
     return <BackdropLoading />;
   }
-
 
   return (
     <div className={classes.root}>
@@ -402,7 +334,6 @@ const LoggedInLayout = ({ children, themeToggle }) => {
             noWrap
             className={classes.title}
           >
-            {/* {greaterThenSm && user?.profile === "admin" && getDateAndDifDays(user?.company?.dueDate).difData < 7 ? ( */}
             {greaterThenSm && user?.profile === "admin" && user?.company?.dueDate ? (
               <>
                 Olá <b>{user.name}</b>, Bem vindo a <b>{user?.company?.name}</b>! (Ativo até {dateToClient(user?.company?.dueDate)})
@@ -414,22 +345,12 @@ const LoggedInLayout = ({ children, themeToggle }) => {
             )}
           </Typography>
 
-          <IconButton edge="start" onClick={toggleColorMode}>
-            {theme.mode === 'dark' ? <Brightness7Icon style={{ color: "white" }} /> : <Brightness4Icon style={{ color: "white" }} />}
-          </IconButton>
+          <UserLanguageSelector iconOnly={true} />
 
           <NotificationsVolume
             setVolume={setVolume}
             volume={volume}
           />
-
-          <IconButton
-            onClick={handleRefreshPage}
-            aria-label={i18n.t("mainDrawer.appBar.refresh")}
-            color="inherit"
-          >
-            <CachedIcon style={{ color: "white" }} />
-          </IconButton>
 
           {user.id && <NotificationsPopOver volume={volume} />}
 
@@ -466,13 +387,23 @@ const LoggedInLayout = ({ children, themeToggle }) => {
               <MenuItem onClick={handleOpenUserModal}>
                 {i18n.t("mainDrawer.appBar.user.profile")}
               </MenuItem>
+              <MenuItem onClick={toggleColorMode}>
+                {theme.mode === 'dark' ? (
+                  <>
+                    <Brightness7Icon style={{ marginRight: 8 }} /> Modo Claro
+                  </>
+                ) : (
+                  <>
+                    <Brightness4Icon style={{ marginRight: 8 }} /> Modo Escuro
+                  </>
+                )}
+              </MenuItem>
             </Menu>
           </div>
         </Toolbar>
       </AppBar>
       <main className={classes.content}>
         <div className={classes.appBarSpacer} />
-
         {children ? children : null}
       </main>
     </div>

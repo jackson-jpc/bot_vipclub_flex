@@ -7,14 +7,17 @@ import Typography from "@material-ui/core/Typography";
 import Grid from "@material-ui/core/Grid";
 import Modal from "@material-ui/core/Modal";
 import { AuthContext } from "../../context/Auth/AuthContext";
-import { Button, Divider, } from "@material-ui/core";
-import { useTheme } from "@material-ui/core/styles"; // Importar useTheme
+import { Button, Divider, Card, Box } from "@material-ui/core";
+import { useTheme } from "@material-ui/core/styles";
 import NewTicketModal from "../NewTicketModal";
+import PhoneIcon from '@material-ui/icons/Phone';
+import PersonIcon from '@material-ui/icons/Person';
+import ChatBubbleIcon from '@material-ui/icons/ChatBubble';
 
 const VCardPreview = ({ contact, numbers }) => {
     const history = useHistory();
     const { user } = useContext(AuthContext);
-    const theme = useTheme(); // Usar o hook useTheme para acessar o tema
+    const theme = useTheme();
 
     const [selectedContact, setContact] = useState({
         name: "",
@@ -22,13 +25,13 @@ const VCardPreview = ({ contact, numbers }) => {
         profilePicUrl: ""
     });
 
-	const [selectedQueue, setSelectedQueue] = useState("");
-	const [isModalOpen, setModalOpen] = useState(false);
+    const [selectedQueue, setSelectedQueue] = useState("");
+    const [isModalOpen, setModalOpen] = useState(false);
     const [isContactValid, setContactValid] = useState(true);
     const [newTicketModalOpen, setNewTicketModalOpen] = useState(false);
     const [contactTicket, setContactTicket] = useState({});
 
-	const handleQueueSelection = async (queueId) => {
+    const handleQueueSelection = async (queueId) => {
         setSelectedQueue(queueId);
         setModalOpen(false);
         if (queueId !== "") {
@@ -39,7 +42,7 @@ const VCardPreview = ({ contact, numbers }) => {
     const renderQueueModal = () => {
         return (
             <Modal open={isModalOpen} onClose={() => setModalOpen(false)}>
-                <div style={{
+                <Card style={{
                     position: "absolute",
                     top: "50%",
                     left: "50%",
@@ -47,16 +50,30 @@ const VCardPreview = ({ contact, numbers }) => {
                     backgroundColor: theme.palette.background.paper,
                     padding: "20px",
                     outline: "none",
+                    minWidth: "300px",
+                    boxShadow: theme.shadows[10],
                 }}>
-                    <h2>Selecione a Fila</h2>
+                    <Typography variant="h6" style={{ marginBottom: "20px", color: theme.palette.text.primary }}>
+                        Selecione a Fila
+                    </Typography>
+                    <Divider style={{ marginBottom: "20px" }} />
                     {user.queues.map((queue) => (
-                        <div key={queue.id}>
-                            <Button onClick={() => handleQueueSelection(queue.id)}>
+                        <Box key={queue.id} mb={1}>
+                            <Button 
+                                fullWidth
+                                variant="outlined"
+                                onClick={() => handleQueueSelection(queue.id)}
+                                style={{
+                                    justifyContent: "flex-start",
+                                    color: theme.palette.text.primary,
+                                    borderColor: theme.palette.divider,
+                                }}
+                            >
                                 {queue.name}
                             </Button>
-                        </div>
+                        </Box>
                     ))}
-                </div>
+                </Card>
             </Modal>
         );
     };
@@ -78,8 +95,8 @@ const VCardPreview = ({ contact, numbers }) => {
                     setContact(contactObj);
                 }
             
-            	if(data.invalido){
-        			setContactValid(false);
+                if(data.invalido){
+                    setContactValid(false);
                 }
             } catch (err) {
                 toastError(err);
@@ -90,13 +107,13 @@ const VCardPreview = ({ contact, numbers }) => {
         return () => clearTimeout(delayDebounceFn);
     }, [contact, numbers]);
 
-	const handleNewChat = () => {
-    	if (selectedQueue === "") {
-        	setModalOpen(true);
-    	} else {
-        	createTicket();
-    	}
-	};
+    const handleNewChat = () => {
+        if (selectedQueue === "") {
+            setModalOpen(true);
+        } else {
+            createTicket();
+        }
+    };
 
     const createTicket = async (queueId) => {
         try {
@@ -135,52 +152,120 @@ const VCardPreview = ({ contact, numbers }) => {
 
     return (
         <>
-    		{renderQueueModal()}
-            <div style={{
-                minWidth: "250px",
+            {renderQueueModal()}
+            <Card style={{
+                minWidth: "300px",
+                backgroundColor: theme.palette.background.paper,
+                boxShadow: theme.shadows[3],
+                borderRadius: "12px",
+                overflow: "hidden",
             }}>
-            <NewTicketModal
-                modalOpen={newTicketModalOpen}
-                initialContact={selectedContact}
-                onClose={(ticket) => {
-                    handleCloseOrOpenTicket(ticket);
-                }}
-            />
-                <Grid container spacing={1}>
-                    <Grid item xs={1}>
-                        <Avatar src={selectedContact.profilePicUrl} />
-                    </Grid>
-                    <Grid item xs={9}>
-                        <Typography style={{ marginTop: "12px", marginLeft: "10px", color: theme.palette.text.vcard }} variant="subtitle1" gutterBottom>
-                            {selectedContact.name}
-                        </Typography>
-                    </Grid>
-					<Grid item xs={9}>
-                        <Typography style={{ marginLeft: "10px", color: theme.palette.text.vcard }} variant="body2" gutterBottom>
-                            <strong>Nome:</strong> {selectedContact.name}
-                        </Typography>
-                        <Typography style={{ marginLeft: "10px", color: theme.palette.text.vcard }} variant="body2" gutterBottom>
-                            <Typography variant="body2" component="span">
-                                <strong>Telefone:</strong> {selectedContact.number}
+                <NewTicketModal
+                    modalOpen={newTicketModalOpen}
+                    initialContact={selectedContact}
+                    onClose={(ticket) => {
+                        handleCloseOrOpenTicket(ticket);
+                    }}
+                />
+                <Box p={2}>
+                    <Grid container spacing={2} alignItems="center">
+                        <Grid item>
+                            <Avatar 
+                                src={selectedContact.profilePicUrl} 
+                                style={{
+                                    width: "60px",
+                                    height: "60px",
+                                    backgroundColor: theme.palette.primary.main,
+                                }}
+                            >
+                                {selectedContact.name.charAt(0)}
+                            </Avatar>
+                        </Grid>
+                        <Grid item xs>
+                            <Typography 
+                                variant="h6" 
+                                style={{ 
+                                    fontWeight: 600,
+                                    color: theme.palette.text.primary,
+                                }}
+                            >
+                                {selectedContact.name}
                             </Typography>
-                        </Typography>
+                            <Typography 
+                                variant="body2" 
+                                style={{ 
+                                    color: theme.palette.text.secondary,
+                                }}
+                            >
+                                {selectedContact.number}
+                            </Typography>
+                        </Grid>
                     </Grid>
-                    <Grid item xs={12}>
-                        <Divider />
+
+                    <Box mt={2} mb={2}>
+                        <Divider style={{ backgroundColor: theme.palette.divider }} />
+                    </Box>
+
+                    <Grid container spacing={1}>
+                        <Grid item xs={12}>
+                            <Box display="flex" alignItems="center" mb={1}>
+                                <PersonIcon 
+                                    fontSize="small" 
+                                    style={{ 
+                                        marginRight: "8px",
+                                        color: theme.palette.text.secondary,
+                                    }} 
+                                />
+                                <Typography variant="body2" style={{ color: theme.palette.text.secondary }}>
+                                    <strong>Nome:</strong> {selectedContact.name}
+                                </Typography>
+                            </Box>
+                            <Box display="flex" alignItems="center">
+                                <PhoneIcon 
+                                    fontSize="small" 
+                                    style={{ 
+                                        marginRight: "8px",
+                                        color: theme.palette.text.secondary,
+                                    }} 
+                                />
+                                <Typography variant="body2" style={{ color: theme.palette.text.secondary }}>
+                                    <strong>Telefone:</strong> {selectedContact.number}
+                                </Typography>
+                            </Box>
+                        </Grid>
+                    </Grid>
+
+                    <Box mt={3}>
                         <Button
                             fullWidth
-                            color="theme.palette.text.vcard"
+                            variant="contained"
+                            color="primary"
+                            startIcon={<ChatBubbleIcon />}
                             onClick={() => {
                                 setContactTicket(selectedContact);
                                 setNewTicketModalOpen(true);
                             }}
                             disabled={!selectedContact.number || !isContactValid}
+                            style={{
+                                borderRadius: "8px",
+                                padding: "10px",
+                                textTransform: "none",
+                                fontWeight: 600,
+                                backgroundColor: isContactValid 
+                                    ? theme.palette.primary.main 
+                                    : theme.palette.error.main,
+                                color: theme.palette.getContrastText(
+                                    isContactValid 
+                                        ? theme.palette.primary.main 
+                                        : theme.palette.error.main
+                                ),
+                            }}
                         >
-                            {isContactValid  ? "Conversar (Novo Ticket)" : "CONTATO FORA DO WHATSAPP"}
+                            {isContactValid ? "Iniciar conversa" : "Contato inválido"}
                         </Button>
-                    </Grid>
-                </Grid>
-            </div>
+                    </Box>
+                </Box>
+            </Card>
         </>
     );
 };

@@ -78,7 +78,16 @@ export default async function DashboardDataService(
             group by 1
             having count(tt1.id) = 1
           ) leads
-        ) "leads"
+        ) "leads",
+        (
+          select count(id)
+          from "Companies"
+        ) "totalCompanies",
+        (
+          select count(id)
+          from "Whatsapps"
+          where session <> ''
+        ) "totalWhatsappSessions"
     ),
     attedants as (
       select

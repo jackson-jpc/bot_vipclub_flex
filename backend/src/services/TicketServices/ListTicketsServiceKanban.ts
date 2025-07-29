@@ -42,18 +42,18 @@ const ListTicketsServiceKanban = async ({
   status,
   date,
   updatedAt,
-  showAll,
+  showAll = "true",
   userId,
   withUnreadMessages,
   companyId
 }: Request): Promise<Response> => {
   let whereCondition: Filterable["where"] = {
-    [Op.or]: [{ userId }, { status: "pending" }],
-    queueId: { [Op.or]: [queueIds, null] }
+    queueId: { [Op.or]: [queueIds, null] },
+    companyId,
+    status: { [Op.or]: ["pending", "open", "closed"] }
   };
-  let includeCondition: Includeable[];
 
-  includeCondition = [
+  let includeCondition: Includeable[] = [
     {
       model: Contact,
       as: "contact",
@@ -80,15 +80,6 @@ const ListTicketsServiceKanban = async ({
       attributes: ["name"]
     },
   ];
-
-  if (showAll === "true") {
-    whereCondition = { queueId: { [Op.or]: [queueIds, null] } };
-  }
-
-  whereCondition = {
-    ...whereCondition,
-    status: { [Op.or]: ["pending", "open"] }
-  };
 
   if (searchParam) {
     const sanitizedSearchParam = searchParam.toLocaleLowerCase().trim();
@@ -135,6 +126,7 @@ const ListTicketsServiceKanban = async ({
 
   if (date) {
     whereCondition = {
+      ...whereCondition,
       createdAt: {
         [Op.between]: [+startOfDay(parseISO(date)), +endOfDay(parseISO(date))]
       }
@@ -143,6 +135,7 @@ const ListTicketsServiceKanban = async ({
 
   if (updatedAt) {
     whereCondition = {
+      ...whereCondition,
       updatedAt: {
         [Op.between]: [
           +startOfDay(parseISO(updatedAt)),
@@ -153,18 +146,14 @@ const ListTicketsServiceKanban = async ({
   }
 
   if (withUnreadMessages === "true") {
-    const user = await ShowUserService(userId);
-    const userQueueIds = user.queues.map(queue => queue.id);
-
     whereCondition = {
-      [Op.or]: [{ userId }, { status: "pending" }],
-      queueId: { [Op.or]: [userQueueIds, null] },
+      ...whereCondition,
       unreadMessages: { [Op.gt]: 0 }
     };
   }
 
   if (Array.isArray(tags) && tags.length > 0) {
-    const ticketsTagFilter: any[] | null = [];
+    const ticketsTagFilter: any[] = [];
     for (let tag of tags) {
       const ticketTags = await TicketTag.findAll({
         where: { tagId: tag }
@@ -185,7 +174,7 @@ const ListTicketsServiceKanban = async ({
   }
 
   if (Array.isArray(users) && users.length > 0) {
-    const ticketsUserFilter: any[] | null = [];
+    const ticketsUserFilter: any[] = [];
     for (let user of users) {
       const ticketUsers = await Ticket.findAll({
         where: { userId: user }
@@ -208,11 +197,6 @@ const ListTicketsServiceKanban = async ({
   const limit = 40;
   const offset = limit * (+pageNumber - 1);
 
-  whereCondition = {
-    ...whereCondition,
-    companyId
-  };
-
   const { count, rows: tickets } = await Ticket.findAndCountAll({
     where: whereCondition,
     include: includeCondition,
@@ -222,6 +206,7 @@ const ListTicketsServiceKanban = async ({
     order: [["updatedAt", "DESC"]],
     subQuery: false
   });
+
   const hasMore = count > offset + tickets.length;
 
   return {

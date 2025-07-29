@@ -630,10 +630,31 @@ const MainListItems = (props) => {
                 <img style={{ width: "100%", padding: "10px" }} src={logo} alt="image" />            
               </Hidden> 
               */}
-              <Typography style={{ fontSize: "12px", padding: "10px", textAlign: "right", fontWeight: "bold" }}>
-                V: {`${version}`}
-
-                </Typography>
+<Typography 
+  style={{ 
+    fontSize: "12px", 
+    padding: "10px", 
+    textAlign: "right", 
+    fontWeight: "bold",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "flex-end",
+    gap: "4px"
+  }}
+>
+  {`${version}`}
+  <span style={{
+    backgroundColor: "green",
+    color: "white",
+    fontSize: "10px",
+    padding: "2px 6px",
+    borderRadius: "10px",
+    fontWeight: "bold",
+    lineHeight: "normal"
+  }}>
+    latest
+  </span>
+</Typography>
               </React.Fragment>
             )}
           </>
