@@ -12,6 +12,9 @@ LOG_FILE="/tmp/atualizacao_prorrac.log"
 VARS_FILE="/tmp/atualizacao_prorrac.vars"
 BUILD_LOG="/tmp/build_frontend.log"
 
+# Trap para limpar arquivos temporários
+trap 'rm -f "$LOG_FILE" "$VARS_FILE" "$BUILD_LOG"' EXIT
+
 # Banner visual
 print_banner() {
   clear
@@ -121,10 +124,13 @@ if [[ "$etapa" == "inicio" ]]; then
   }
 
   mkdir "$new_folder"
+
+  # Cópia limpa
   if command -v rsync &>/dev/null; then
-    rsync -a "$source_folder/" "$new_folder/"
+    rsync -a --exclude='node_modules' --exclude='build' --exclude='dist' --exclude='public' "$source_folder/" "$new_folder/"
   else
-    cp -r "$source_folder/"* "$new_folder"
+    cp -r "$source_folder/"* "$new_folder/"
+    rm -rf "$new_folder"/{frontend,backend}/{node_modules,build,dist,public,.next,.cache}
   fi
 
   salvar_variaveis
@@ -139,8 +145,13 @@ if [[ "$etapa" == "copiar_arquivos" ]]; then
   for file in backend/.env frontend/.env frontend/server.js; do
     if ! cmp -s "$new_old_folder/$file" "$new_folder/$file"; then
       echo -e "${RED}⚠ Arquivo $file está diferente ou ausente.${NC}"
-      read -p "Deseja continuar mesmo assim? [Y/N]: " confirma
-      [[ ! "$confirma" =~ ^[Yy]$ ]] && exit 1
+      read -p "Deseja restaurar a versão antiga de $file? [Y/N]: " confirma
+      if [[ "$confirma" =~ ^[Yy]$ ]]; then
+        cp "$new_old_folder/$file" "$new_folder/$file"
+        echo -e "${YELLOW}✔ Arquivo $file restaurado da versão antiga.${NC}"
+      else
+        echo -e "${YELLOW}⚠ Mantendo versão nova de $file.${NC}"
+      fi
     fi
   done
   salvar_etapa "backend"
@@ -152,6 +163,7 @@ if [[ "$etapa" == "backend" ]]; then
   print_banner
   echo -e "${CYAN}🚧 Instalando BACKEND...${NC}"
   cd "$deploy_path/$new_folder/backend" || exit 1
+  rm -rf node_modules dist
   npm install || { echo -e "${RED}Erro ao instalar dependências.${NC}"; exit 1; }
   npm run build || { echo -e "${RED}Erro ao compilar backend.${NC}"; exit 1; }
   npx sequelize db:migrate || { echo -e "${RED}Erro ao migrar banco.${NC}"; exit 1; }
@@ -165,6 +177,7 @@ if [[ "$etapa" == "frontend" ]]; then
   print_banner
   echo -e "${CYAN}🚧 Instalando FRONTEND...${NC}"
   cd "$deploy_path/$new_folder/frontend" || exit 1
+  rm -rf node_modules build .next .cache
   npm install || { echo -e "${RED}Erro ao instalar dependências.${NC}"; exit 1; }
 
   echo -e "${CYAN}🌐 Atualizando Browserslist...${NC}"
@@ -200,7 +213,7 @@ if [[ "$etapa" == "pm2" ]]; then
   echo -e "${CYAN}- Verifique logs com: pm2 logs"
   echo -e "${CYAN}- Acesse: http://<seu-servidor>"
   echo
-  echo -e "${GREEN}💡 Suporte: www.plwdesign.online${NC}"
+  echo -e "${GREEN}💡 Suporte: suporte@prorrac.com.br${NC}"
 
   rm -f "$LOG_FILE" "$VARS_FILE" "$BUILD_LOG"
 fi
