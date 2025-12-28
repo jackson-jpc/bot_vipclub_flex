@@ -31,6 +31,7 @@ import ListItemIcon from "@material-ui/core/ListItemIcon";
 import ListItemText from "@material-ui/core/ListItemText";
 import Button from "@material-ui/core/Button";
 import Box from "@material-ui/core/Box";
+import Typography from "@material-ui/core/Typography";
 
 import { i18n } from "../../translate/i18n";
 import api from "../../services/api";
@@ -46,6 +47,8 @@ import toastError from "../../errors/toastError";
 import Compressor from 'compressorjs';
 import LinearWithValueLabel from "./ProgressBarCustom";
 import useQuickMessages from "../../hooks/useQuickMessages";
+import MediaPreview from "../MediaPreview";
+import QuickMessageEditModal from "../QuickMessageEditModal";
 
 const Mp3Recorder = new MicRecorder({ bitRate: 128 });
 
@@ -72,6 +75,7 @@ const useStyles = makeStyles((theme) => ({
     display: "flex",
     borderRadius: 20,
     flex: 1,
+    position: "relative",
   },
   messageInput: {
     paddingLeft: 10,
@@ -108,7 +112,7 @@ const useStyles = makeStyles((theme) => ({
     bottom: "100%",
     left: 0,
     width: "200px",
-    backgroundColor: "#fff",
+    backgroundColor: theme.palette.background.paper,
     borderRadius: "8px",
     boxShadow: "0 2px 5px rgba(0,0,0,0.2)",
     zIndex: 1000,
@@ -245,6 +249,28 @@ const useStyles = makeStyles((theme) => ({
   audioIcon: {
     color: green[500],
   },
+  // Drag and drop styles
+  dragOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(102, 126, 234, 0.1)',
+    border: '2px dashed #667eea',
+    borderRadius: '20px',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 1000,
+    pointerEvents: 'none',
+  },
+  dragOverlayText: {
+    color: '#667eea',
+    fontSize: '16px',
+    fontWeight: 600,
+    textAlign: 'center',
+  },
 }));
 
 const EmojiOptions = (props) => {
@@ -300,7 +326,7 @@ const SignSwitch = (props) => {
 };
 
 const FileInput = (props) => {
-  const { handleChangeMedias, disableOption, setMedias } = props;
+  const { handleChangeMedias, disableOption, setMedias, setSelectedMediaType } = props;
   const classes = useStyles();
   const [showOptions, setShowOptions] = useState(false);
   const fileInputRef = useRef(null);
@@ -314,6 +340,10 @@ const FileInput = (props) => {
 
   const handleOptionClick = (type) => {
     setShowOptions(false);
+    // Define o tipo de mídia escolhido
+    if (setSelectedMediaType) {
+      setSelectedMediaType(type);
+    }
     switch(type) {
       case 'image':
         fileInputRef.current.click();
@@ -400,9 +430,13 @@ const FileInput = (props) => {
         type="file"
         ref={fileInputRef}
         accept="image/*"
+        multiple
         style={{ display: 'none' }}
         onChange={(e) => {
-          if (e.target.files) handleChangeMedias(Array.from(e.target.files));
+          if (e.target.files) {
+            handleChangeMedias(Array.from(e.target.files));
+            e.target.value = ''; // Limpa o input para permitir selecionar o mesmo arquivo novamente
+          }
         }}
       />
       <input
@@ -411,24 +445,35 @@ const FileInput = (props) => {
         accept="audio/*"
         style={{ display: 'none' }}
         onChange={(e) => {
-          if (e.target.files) handleChangeMedias(Array.from(e.target.files));
+          if (e.target.files) {
+            handleChangeMedias(Array.from(e.target.files));
+            e.target.value = ''; // Limpa o input para permitir selecionar o mesmo arquivo novamente
+          }
         }}
       />
       <input
         type="file"
         ref={videoInputRef}
         accept="video/*"
+        multiple
         style={{ display: 'none' }}
         onChange={(e) => {
-          if (e.target.files) handleChangeMedias(Array.from(e.target.files));
+          if (e.target.files) {
+            handleChangeMedias(Array.from(e.target.files));
+            e.target.value = ''; // Limpa o input para permitir selecionar o mesmo arquivo novamente
+          }
         }}
       />
       <input
         type="file"
         ref={documentInputRef}
+        multiple
         style={{ display: 'none' }}
         onChange={(e) => {
-          if (e.target.files) handleChangeMedias(Array.from(e.target.files));
+          if (e.target.files) {
+            handleChangeMedias(Array.from(e.target.files));
+            e.target.value = ''; // Limpa o input para permitir selecionar o mesmo arquivo novamente
+          }
         }}
       />
     </>
@@ -446,11 +491,12 @@ const ActionButtons = (props) => {
     handleUploadAudio,
     handleStartRecording,
     handleOpenModalForward,
-    showSelectMessageCheckbox
+    showSelectMessageCheckbox,
+    selectedMedias = []
   } = props;
   const classes = useStyles();
   
-  if (inputMessage || showSelectMessageCheckbox) {
+  if (inputMessage || selectedMedias.length > 0 || showSelectMessageCheckbox) {
     return (
       <IconButton
         aria-label="sendMessage"
@@ -516,7 +562,11 @@ const CustomInput = (props) => {
     handleSendMessage,
     handleInputPaste,
     disableOption,
-    replyingMessage
+    replyingMessage,
+    onDragOver,
+    onDragLeave,
+    onDrop,
+    isDragOver
   } = props;
   const classes = useStyles();
 
@@ -548,7 +598,19 @@ const CustomInput = (props) => {
   };
 
   return (
-    <div className={classes.messageInputWrapper}>
+    <div 
+      className={classes.messageInputWrapper}
+      onDragOver={onDragOver}
+      onDragLeave={onDragLeave}
+      onDrop={onDrop}
+    >
+      {isDragOver && (
+        <div className={classes.dragOverlay}>
+          <div className={classes.dragOverlayText}>
+            Solte os arquivos aqui
+          </div>
+        </div>
+      )}
       <InputBase
         inputRef={setInputRef}
         placeholder={renderPlaceholder()}
@@ -561,6 +623,110 @@ const CustomInput = (props) => {
         onKeyPress={onKeyPress}
         disabled={disableOption()}
       />
+    </div>
+  );
+};
+
+const GeminiSuggestions = ({ suggestions, loading, onSuggestionClick, onClose }) => {
+  const classes = useStyles();
+  const containerRef = useRef(null);
+  const [scrollPosition, setScrollPosition] = useState(0);
+  const [maxScroll, setMaxScroll] = useState(0);
+
+  useEffect(() => {
+    if (containerRef.current) {
+      setMaxScroll(containerRef.current.scrollWidth - containerRef.current.clientWidth);
+    }
+  }, [suggestions]);
+
+  const handleScroll = (direction) => {
+    if (!containerRef.current) return;
+    
+    const container = containerRef.current;
+    const scrollAmount = 200;
+    
+    if (direction === 'left') {
+      container.scrollLeft -= scrollAmount;
+    } else {
+      container.scrollLeft += scrollAmount;
+    }
+    
+    setTimeout(() => {
+      setScrollPosition(container.scrollLeft);
+    }, 300);
+  };
+
+  if (!suggestions || suggestions.length === 0) {
+    if (loading) {
+      return (
+        <div className={classes.quickMessagesWrapper}>
+          <div style={{ padding: '10px', textAlign: 'center', color: '#666' }}>
+            Carregando sugestões...
+          </div>
+        </div>
+      );
+    }
+    return null;
+  }
+
+  return (
+    <div className={classes.quickMessagesWrapper}>
+      <div style={{ 
+        display: 'flex', 
+        justifyContent: 'space-between', 
+        alignItems: 'center',
+        padding: '5px 10px',
+        backgroundColor: '#f5f5f5',
+        borderBottom: '1px solid #e0e0e0'
+      }}>
+        <Typography variant="caption" style={{ fontWeight: 600, color: '#666' }}>
+          Sugestões do Gemini
+        </Typography>
+        <IconButton 
+          size="small" 
+          onClick={onClose}
+          style={{ padding: '4px' }}
+        >
+          <ClearIcon fontSize="small" />
+        </IconButton>
+      </div>
+      {scrollPosition > 0 && (
+        <IconButton 
+          className={`${classes.navButton} left`}
+          onClick={() => handleScroll('left')}
+        >
+          <ChevronLeft />
+        </IconButton>
+      )}
+
+      <div 
+        className={classes.quickMessagesContainer} 
+        ref={containerRef}
+        onScroll={(e) => setScrollPosition(e.target.scrollLeft)}
+      >
+        {suggestions.map((suggestion, index) => (
+          <Button
+            key={index}
+            variant="contained"
+            disableElevation
+            className={classes.quickMessageButton}
+            onClick={() => onSuggestionClick(suggestion)}
+            style={{ backgroundColor: '#4285f4' }}
+          >
+            <Message className="start-icon" />
+            {suggestion}
+          </Button>
+        ))}
+      </div>
+
+      {scrollPosition < maxScroll && (
+        <IconButton 
+          className={`${classes.navButton} right`}
+          onClick={() => handleScroll('right')}
+        >
+          <ChevronRight />
+        </IconButton>
+      )}
     </div>
   );
 };
@@ -705,6 +871,9 @@ const MessageInputCustom = (props) => {
   const [showEmoji, setShowEmoji] = useState(false);
   const [loading, setLoading] = useState(false);
   const [recording, setRecording] = useState(false);
+  const [isDragOver, setIsDragOver] = useState(false);
+  const [selectedMedias, setSelectedMedias] = useState([]);
+  const [selectedMediaType, setSelectedMediaType] = useState(null); // Tipo escolhido pelo usuário
   const inputRef = useRef();
   const { setReplyingMessage, replyingMessage } =
     useContext(ReplyMessageContext);
@@ -719,6 +888,18 @@ const MessageInputCustom = (props) => {
 
   const [quickMessages, setQuickMessages] = useState([]);
   const { list: listQuickMessages } = useQuickMessages();
+  const [quickMessageEditModalOpen, setQuickMessageEditModalOpen] = useState(false);
+  const [quickMessageToEdit, setQuickMessageToEdit] = useState(null);
+
+  const [geminiSuggestions, setGeminiSuggestions] = useState([]);
+  const [loadingSuggestions, setLoadingSuggestions] = useState(false);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const lastPromptRef = useRef("");
+  const suggestionsCacheRef = useRef(new Map()); // Cache de sugestões
+  const lastRequestTimeRef = useRef(0); // Controle de rate limiting
+  const requestCountRef = useRef(0); // Contador de requisições
+  const MIN_TIME_BETWEEN_REQUESTS = 2000; // 2 segundos entre requisições
+  const MIN_CHARS_FOR_REQUEST = 3; // Mínimo de 3 caracteres após "!"
 
   useEffect(() => {
     inputRef.current.focus();
@@ -726,12 +907,17 @@ const MessageInputCustom = (props) => {
 
   useEffect(() => {
     inputRef.current.focus();
-    return () => {
-      setInputMessage("");
-      setShowEmoji(false);
-      setMedias([]);
-      setReplyingMessage(null);
-    };
+      return () => {
+        setInputMessage("");
+        setShowEmoji(false);
+        setMedias([]);
+        setSelectedMedias([]);
+        setSelectedMediaType(null);
+        setReplyingMessage(null);
+        setShowSuggestions(false);
+        setGeminiSuggestions([]);
+        lastPromptRef.current = "";
+      };
   }, [ticketId, setReplyingMessage]);
 
   useEffect(() => {
@@ -742,6 +928,126 @@ const MessageInputCustom = (props) => {
     }
     fetchData();
   }, []);
+
+  // Detectar "!" e buscar sugestões com cache e rate limiting
+  useEffect(() => {
+    const fetchSuggestions = async () => {
+      const trimmedMessage = inputMessage.trim();
+      
+      // Verificar se começa com "!" e tem pelo menos 2 caracteres
+      if (trimmedMessage.startsWith("!") && trimmedMessage.length > 1) {
+        const prompt = trimmedMessage.substring(1).trim(); // Texto após "!"
+        
+        // Verificar se tem caracteres suficientes
+        if (prompt.length < MIN_CHARS_FOR_REQUEST) {
+          setShowSuggestions(false);
+          setGeminiSuggestions([]);
+          return;
+        }
+        
+        if (prompt.length > 0) {
+          // Verificar cache primeiro
+          const cacheKey = prompt.toLowerCase();
+          const cachedSuggestions = suggestionsCacheRef.current.get(cacheKey);
+          
+          if (cachedSuggestions) {
+            // Usar sugestões do cache
+            setGeminiSuggestions(cachedSuggestions);
+            setShowSuggestions(true);
+            lastPromptRef.current = prompt;
+            return;
+          }
+          
+          // Verificar rate limiting
+          const now = Date.now();
+          const timeSinceLastRequest = now - lastRequestTimeRef.current;
+          
+          if (timeSinceLastRequest < MIN_TIME_BETWEEN_REQUESTS && lastRequestTimeRef.current > 0) {
+            // Aguardar antes de fazer nova requisição
+            // Não fazer requisição agora, apenas mostrar loading
+            setShowSuggestions(true);
+            setLoadingSuggestions(true);
+            return;
+          }
+          
+          // Verificar se o prompt mudou para evitar requisições desnecessárias
+          if (lastPromptRef.current !== prompt && !loadingSuggestions) {
+            setLoadingSuggestions(true);
+            setShowSuggestions(true);
+            lastPromptRef.current = prompt;
+            lastRequestTimeRef.current = now;
+            requestCountRef.current += 1;
+            
+            try {
+              const response = await api.post("/gemini/suggestions", {
+                prompt: prompt
+              });
+              if (response.data && response.data.suggestions) {
+                const suggestions = response.data.suggestions;
+                setGeminiSuggestions(suggestions);
+                // Armazenar no cache (expira após 5 minutos)
+                suggestionsCacheRef.current.set(cacheKey, suggestions);
+                setTimeout(() => {
+                  suggestionsCacheRef.current.delete(cacheKey);
+                }, 5 * 60 * 1000); // 5 minutos
+              } else {
+                throw new Error("Resposta inválida do servidor");
+              }
+            } catch (error) {
+              console.error("Erro ao buscar sugestões:", error);
+              const errorMessage = error?.response?.data?.error || 
+                                 error?.message || 
+                                 "Erro ao buscar sugestões do Gemini. Verifique se o token está configurado corretamente.";
+              
+              // Verificar se é erro 429 (rate limit)
+              if (error?.response?.status === 429 || errorMessage.includes("Resource exhausted") || errorMessage.includes("429") || errorMessage.includes("Limite de requisições")) {
+                toastError("Limite de requisições excedido. Aguarde alguns segundos antes de tentar novamente.");
+                // Limpar cache para forçar nova tentativa depois
+                suggestionsCacheRef.current.delete(cacheKey);
+                // Aguardar mais tempo antes da próxima tentativa (30 segundos)
+                lastRequestTimeRef.current = now + 30000;
+                // Mostrar sugestões padrão enquanto aguarda
+                const defaultSuggestions = [
+                  "Olá! Como posso ajudá-lo hoje?",
+                  "Bem-vindo! Em que posso ser útil?",
+                  "Oi! Estou aqui para ajudar.",
+                  "Olá! Fico feliz em poder ajudar você.",
+                  "Oi! Como posso tornar seu dia melhor?"
+                ];
+                setGeminiSuggestions(defaultSuggestions);
+                setShowSuggestions(true);
+                // Não limpar o prompt para permitir nova tentativa depois
+              } else {
+                toastError(errorMessage);
+                setShowSuggestions(false);
+                setGeminiSuggestions([]);
+                lastPromptRef.current = "";
+              }
+            } finally {
+              setLoadingSuggestions(false);
+            }
+          } else if (!showSuggestions && prompt.length > 0) {
+            // Se não está mostrando mas deveria, mostrar
+            setShowSuggestions(true);
+          }
+        } else {
+          // Se só tem "!" sem texto, esconder sugestões
+          setShowSuggestions(false);
+          setGeminiSuggestions([]);
+          lastPromptRef.current = "";
+        }
+      } else if (!trimmedMessage.startsWith("!") && showSuggestions) {
+        // Se não começa mais com "!", esconder sugestões
+        setShowSuggestions(false);
+        setGeminiSuggestions([]);
+        lastPromptRef.current = "";
+      }
+    };
+
+    // Aumentar debounce para 1000ms (1 segundo) para reduzir requisições
+    const timeoutId = setTimeout(fetchSuggestions, 1000);
+    return () => clearTimeout(timeoutId);
+  }, [inputMessage, loadingSuggestions, showSuggestions]);
 
   const handleOpenModalForward = () => {
     if (selectedMessages.length === 0) {
@@ -757,13 +1063,166 @@ const MessageInputCustom = (props) => {
     setInputMessage((prevState) => prevState + emoji);
   };
 
-  const handleChangeMedias = (selectedMedias) => {
-    setMedias(selectedMedias);
+  const isMediaFile = (file) => {
+    return file.type.startsWith('image/') || 
+           file.type.startsWith('video/') || 
+           file.type.startsWith('application/') ||
+           file.type === '' || // For files without extension
+           !file.type.startsWith('audio/');
+  };
+
+  const handleChangeMedias = (selectedFiles) => {
+    const mediaFiles = selectedFiles.filter(isMediaFile);
+    const audioFiles = selectedFiles.filter(file => !isMediaFile(file));
+    
+    if (mediaFiles.length > 0) {
+      // Limit to 100 files total
+      const currentTotal = selectedMedias.length + mediaFiles.length;
+      if (currentTotal > 100) {
+        toastError("Máximo de 100 arquivos permitido");
+        return;
+      }
+      
+      setSelectedMedias(prev => [...prev, ...mediaFiles]);
+      // Manter o tipo selecionado se já foi definido
+    }
+    
+    if (audioFiles.length > 0) {
+      // Direct upload for audio files
+      setMedias(audioFiles);
+    }
   };
 
   const handleInputPaste = (e) => {
     if (e.clipboardData.files[0]) {
-      setMedias([e.clipboardData.files[0]]);
+      const files = Array.from(e.clipboardData.files);
+      handleChangeMedias(files);
+    }
+  };
+
+  // Drag and Drop handlers
+  const handleDragOver = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!isDragOver && ticketStatus === "open") {
+      setIsDragOver(true);
+    }
+  };
+
+  const handleDragLeave = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    // Only hide overlay if leaving the input wrapper completely
+    if (!e.currentTarget.contains(e.relatedTarget)) {
+      setIsDragOver(false);
+    }
+  };
+
+  const handleDrop = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragOver(false);
+    
+    if (ticketStatus !== "open") return;
+    
+    const files = Array.from(e.dataTransfer.files);
+    if (files.length > 0) {
+      handleChangeMedias(files);
+    }
+  };
+
+  const handleAddMoreMedia = (newFiles) => {
+    const mediaFiles = newFiles.filter(isMediaFile);
+    const currentTotal = selectedMedias.length + mediaFiles.length;
+    
+    if (currentTotal > 100) {
+      toastError("Máximo de 100 arquivos permitido");
+      return;
+    }
+    
+    setSelectedMedias(prev => [...prev, ...mediaFiles]);
+  };
+
+  const handleRemoveMedia = (index) => {
+    setSelectedMedias(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const handleSendMediaWithMessage = async () => {
+    if (!selectedMedias || selectedMedias.length === 0) return;
+    
+    setLoading(true);
+    const caption = inputMessage.trim();
+    
+    try {
+      // Process each media file
+      for (const media of selectedMedias) {
+        const formData = new FormData();
+        formData.append("fromMe", true);
+        
+        // Se o usuário escolheu "document", forçar como documento
+        if (selectedMediaType === 'document') {
+          formData.append("forceMediaType", "document");
+        }
+        
+        // Aplicar assinatura se estiver ativa
+        let messageBody = "";
+        if (caption) {
+          // Se há legenda, aplicar assinatura se ativa
+          messageBody = signMessage ? `*${user?.name}:*\n${caption}` : caption;
+        }
+        // Se não há legenda, messageBody fica vazio (não envia nome do arquivo)
+        
+        // Se forçado como documento, não comprimir imagens
+        if (selectedMediaType === 'document') {
+          formData.append("medias", media);
+          formData.append("body", messageBody);
+          await uploadMedia(formData);
+        } else if (media.type.startsWith('image/')) {
+          await new Promise((resolve, reject) => {
+            new Compressor(media, {
+              quality: 0.7,
+              success: async (compressedMedia) => {
+                formData.append("medias", compressedMedia);
+                formData.append("body", messageBody);
+                await uploadMedia(formData);
+                resolve();
+              },
+              error: async (err) => {
+                console.log(err.message);
+                formData.append("medias", media);
+                formData.append("body", messageBody);
+                await uploadMedia(formData);
+                resolve();
+              },
+            });
+          });
+        } else {
+          formData.append("medias", media);
+          formData.append("body", messageBody);
+          await uploadMedia(formData);
+        }
+      }
+    } catch (err) {
+      toastError(err);
+    }
+    
+    setSelectedMedias([]);
+    setSelectedMediaType(null); // Limpar tipo selecionado
+    setInputMessage("");
+    setLoading(false);
+  };
+
+  const uploadMedia = async (formData) => {
+    try {
+      await api.post(`/messages/${ticketId}`, formData, {
+        onUploadProgress: (event) => {
+          let progress = Math.round((event.loaded * 100) / event.total);
+          setPercentLoading(progress);
+        },
+      });
+      setPercentLoading(0);
+    } catch (err) {
+      throw err;
     }
   };
 
@@ -771,10 +1230,16 @@ const MessageInputCustom = (props) => {
     setLoading(true);
     try {
       const extension = blob.type.split("/")[1];
-      const formData = new FormData();
+            const formData = new FormData();
       const filename = `${new Date().getTime()}.${extension}`;
       formData.append("medias", blob, filename);
-      formData.append("body", message);
+      
+      // Aplicar assinatura se estiver ativa
+      const messageBody = signMessage 
+        ? `*${user?.name}:*\n${message}`
+        : message;
+      
+      formData.append("body", messageBody || "");
       formData.append("fromMe", true);
 
       await api.post(`/messages/${ticketId}`, formData);
@@ -786,6 +1251,14 @@ const MessageInputCustom = (props) => {
   };
   
   const handleQuickMessageClick = async (message) => {
+    // Se editBeforeSend estiver ativado, abre modal de edição
+    if (message.editBeforeSend) {
+      setQuickMessageToEdit(message);
+      setQuickMessageEditModalOpen(true);
+      return;
+    }
+    
+    // Comportamento original: envia diretamente
     if (message.mediaPath) {
       try {
         const { data } = await axios.get(message.mediaPath, {
@@ -816,23 +1289,56 @@ const MessageInputCustom = (props) => {
     }
   };
 
+  const handleGeminiSuggestionClick = (suggestion) => {
+    setInputMessage(suggestion);
+    setShowSuggestions(false);
+    setGeminiSuggestions([]);
+    lastPromptRef.current = "";
+    if (inputRef.current) {
+      inputRef.current.focus();
+    }
+  };
+
+  const handleCloseSuggestions = () => {
+    setShowSuggestions(false);
+    setGeminiSuggestions([]);
+    // Remover apenas o "!" e manter o resto do texto se houver
+    const currentText = inputMessage.trim();
+    if (currentText.startsWith("!")) {
+      const textAfterExclamation = currentText.substring(1).trim();
+      setInputMessage(textAfterExclamation);
+    } else {
+      setInputMessage("");
+    }
+    lastPromptRef.current = "";
+  };
+
   const handleUploadMedia = async (e) => {
     setLoading(true);
     e.preventDefault();
 
     const formData = new FormData();
     formData.append("fromMe", true);
+    const caption = inputMessage.trim();
 
     medias.forEach(async (media, idx) => {
       const file = media;
       if (!file) { return; }
+
+      // Para mídias, não enviar nome do arquivo (apenas mídia)
+      let messageBody = "";
+      if (signMessage && caption) {
+        messageBody = `*${user?.name}:*\n${caption}`;
+      } else if (caption) {
+        messageBody = caption;
+      }
 
       if (media?.type.split('/')[0] == 'image') {
         new Compressor(file, {
           quality: 0.7,
           async success(media) {
             formData.append("medias", media);
-            formData.append("body", media.name);
+            formData.append("body", messageBody);
           },
           error(err) {
             console.log(err.message);
@@ -840,7 +1346,7 @@ const MessageInputCustom = (props) => {
         });
       } else {
         formData.append("medias", media);
-        formData.append("body", media.name);
+        formData.append("body", messageBody);
       }
     });
 
@@ -869,6 +1375,15 @@ const MessageInputCustom = (props) => {
   }
 
   const handleSendMessage = async () => {
+    // Se há mídia selecionada, enviar mídia com legenda
+    if (selectedMedias.length > 0) {
+      await handleSendMediaWithMessage();
+      setShowEmoji(false);
+      setReplyingMessage(null);
+      return;
+    }
+
+    // Se não há mídia, enviar apenas texto
     if (inputMessage.trim() === "") return;
     setLoading(true);
 
@@ -919,7 +1434,7 @@ const MessageInputCustom = (props) => {
       const formData = new FormData();
       const filename = `audio-record-site-${new Date().getTime()}.mp3`;
       formData.append("medias", blob, filename);
-      formData.append("body", filename);
+      formData.append("body", "");
       formData.append("fromMe", true);
 
       await api.post(`/messages/${ticketId}`, formData);
@@ -1006,64 +1521,108 @@ const MessageInputCustom = (props) => {
     );
   else {
     return (
-      <Paper square elevation={0} className={classes.mainWrapper}>
-        {replyingMessage && renderReplyingMessage(replyingMessage)}
+      <>        
+        <Paper square elevation={0} className={classes.mainWrapper}>
+          {replyingMessage && renderReplyingMessage(replyingMessage)}
+          
+          {/* MediaPreview acima do input */}
+          {selectedMedias.length > 0 && (
+            <MediaPreview
+              medias={selectedMedias}
+              onAddMore={handleAddMoreMedia}
+              onRemoveMedia={handleRemoveMedia}
+              onClear={() => setSelectedMedias([])}
+            />
+          )}
+          
+          {/* Sugestões do Gemini */}
+          {showSuggestions && (
+            <GeminiSuggestions
+              suggestions={geminiSuggestions}
+              loading={loadingSuggestions}
+              onSuggestionClick={handleGeminiSuggestionClick}
+              onClose={handleCloseSuggestions}
+            />
+          )}
+          
+          {quickMessages.length > 0 && !showSuggestions && (
+            <QuickMessages 
+              quickMessages={quickMessages} 
+              handleQuickMessageClick={handleQuickMessageClick}
+              inputMessage={inputMessage}
+            />
+          )}
+
+          <div className={classes.newMessageBox}>
+            <EmojiOptions
+              disabled={disableOption()}
+              handleAddEmoji={handleAddEmoji}
+              showEmoji={showEmoji}
+              setShowEmoji={setShowEmoji}
+            />
+
+            <FileInput
+              disableOption={disableOption}
+              handleChangeMedias={handleChangeMedias}
+              setMedias={setMedias}
+              setInputMessage={setInputMessage}
+              setSelectedMediaType={setSelectedMediaType}
+            />
+
+            <SignSwitch
+              width={props.width}
+              setSignMessage={setSignMessage}
+              signMessage={signMessage}
+            />
+
+            <CustomInput
+              loading={loading}
+              inputRef={inputRef}
+              ticketStatus={ticketStatus}
+              inputMessage={inputMessage}
+              setInputMessage={setInputMessage}
+              handleSendMessage={handleSendMessage}
+              handleInputPaste={handleInputPaste}
+              disableOption={disableOption}
+              replyingMessage={replyingMessage}
+              onDragOver={handleDragOver}
+              onDragLeave={handleDragLeave}
+              onDrop={handleDrop}
+              isDragOver={isDragOver}
+            />
+
+            <ActionButtons
+              inputMessage={inputMessage}
+              loading={loading}
+              recording={recording}
+              ticketStatus={ticketStatus}
+              handleSendMessage={handleSendMessage}
+              handleCancelAudio={handleCancelAudio}
+              handleUploadAudio={handleUploadAudio}
+              handleStartRecording={handleStartRecording}
+              handleOpenModalForward={handleOpenModalForward}
+              showSelectMessageCheckbox={showSelectMessageCheckbox}
+              selectedMedias={selectedMedias}
+            />
+          </div>
+        </Paper>
         
-        {quickMessages.length > 0 && (
-          <QuickMessages 
-            quickMessages={quickMessages} 
-            handleQuickMessageClick={handleQuickMessageClick}
-            inputMessage={inputMessage}
-          />
-        )}
-
-        <div className={classes.newMessageBox}>
-          <EmojiOptions
-            disabled={disableOption()}
-            handleAddEmoji={handleAddEmoji}
-            showEmoji={showEmoji}
-            setShowEmoji={setShowEmoji}
-          />
-
-          <FileInput
-            disableOption={disableOption}
-            handleChangeMedias={handleChangeMedias}
-            setMedias={setMedias}
-            setInputMessage={setInputMessage}
-          />
-
-          <SignSwitch
-            width={props.width}
-            setSignMessage={setSignMessage}
-            signMessage={signMessage}
-          />
-
-          <CustomInput
-            loading={loading}
-            inputRef={inputRef}
-            ticketStatus={ticketStatus}
-            inputMessage={inputMessage}
-            setInputMessage={setInputMessage}
-            handleSendMessage={handleSendMessage}
-            handleInputPaste={handleInputPaste}
-            disableOption={disableOption}
-            replyingMessage={replyingMessage}
-          />
-
-          <ActionButtons
-            inputMessage={inputMessage}
-            loading={loading}
-            recording={recording}
-            ticketStatus={ticketStatus}
-            handleSendMessage={handleSendMessage}
-            handleCancelAudio={handleCancelAudio}
-            handleUploadAudio={handleUploadAudio}
-            handleStartRecording={handleStartRecording}
-            handleOpenModalForward={handleOpenModalForward}
-            showSelectMessageCheckbox={showSelectMessageCheckbox}
-          />
-        </div>
-      </Paper>
+        {/* Modal de edição de resposta rápida */}
+        <QuickMessageEditModal
+          open={quickMessageEditModalOpen}
+          onClose={() => {
+            setQuickMessageEditModalOpen(false);
+            setQuickMessageToEdit(null);
+          }}
+          quickMessage={quickMessageToEdit}
+          ticketId={ticketId}
+          replyingMessage={replyingMessage}
+          onSend={() => {
+            setInputMessage("");
+            setSelectedMedias([]);
+          }}
+        />
+      </>
     );
   }
 };

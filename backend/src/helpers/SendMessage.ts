@@ -2,7 +2,7 @@ import * as Sentry from "@sentry/node";
 import fs from "fs/promises";
 import path from "path";
 import mime from "mime-types";
-import { WAMessageContent, WAMessage } from "@whiskeysockets/baileys";
+import { WAMessageContent, WAMessage } from "baileys";
 
 import Whatsapp from "../models/Whatsapp";
 import GetWhatsappWbot from "./GetWhatsappWbot";

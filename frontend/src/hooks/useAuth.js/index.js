@@ -38,6 +38,7 @@ const useAuth = () => {
       if (error?.response?.status === 403 && !originalRequest._retry) {
         originalRequest._retry = true;
 
+        console.log('process.env.REACT_APP_BACKEND_URL', process.env.REACT_APP_BACKEND_URL)
         const { data } = await api.post("/auth/refresh_token");
         if (data) {
           localStorage.setItem("token", JSON.stringify(data.token));

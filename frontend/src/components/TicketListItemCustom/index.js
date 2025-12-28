@@ -391,6 +391,23 @@ const TicketListItemCustom = ({ ticket }) => {
     }
   };
 
+  const handleSendMessage = async (id) => {
+        
+    const msg = `{{ms}} *{{name}}*, meu nome é *${user?.name}* e agora vou prosseguir com seu atendimento!`;
+    const message = {
+        read: 1,
+        fromMe: true,
+        mediaUrl: "",
+        body: `*Mensagem Automática:*\n${msg.trim()}`,
+    };
+    try {
+        await api.post(`/messages/${id}`, message);
+    } catch (err) {
+        toastError(err);
+        
+    }
+};
+
   const handleAcceptTicket = async (id) => {
     setLoading(true);
     try {
@@ -400,7 +417,19 @@ const TicketListItemCustom = ({ ticket }) => {
       });
       history.push(`/tickets/${ticket.uuid}`);
     } catch (err) {
-      toastError(err);
+      // Verificar se é erro de ticket já aberto
+      const errorMessage = err?.response?.data?.error || err?.message || "";
+      if (errorMessage.includes("TICKET_ALREADY_OPEN")) {
+        const parts = errorMessage.split("|");
+        if (parts.length >= 2) {
+          const attendingName = parts[1] || "Atendente";
+          toastError(`Este ticket já está sendo atendido por: ${attendingName}`);
+        } else {
+          toastError("Este ticket já está sendo atendido por outro atendente.");
+        }
+      } else {
+        toastError(err);
+      }
     } finally {
       if (isMounted.current) setLoading(false);
     }

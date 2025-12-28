@@ -18,6 +18,7 @@ import { TagsContainer } from "../TagsContainer";
 import TicketActionButtons from "../TicketActionButtonsCustom";
 import TicketHeader from "../TicketHeader";
 import TicketInfo from "../TicketInfo";
+import MessageSearch from "../MessageSearch";
 
 const drawerWidth = 320;
 
@@ -67,6 +68,8 @@ const Ticket = () => {
   const [loading, setLoading] = useState(true);
   const [contact, setContact] = useState({});
   const [ticket, setTicket] = useState({});
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [messages, setMessages] = useState([]);
 
   const socketManager = useContext(SocketContext);
 
@@ -140,6 +143,27 @@ const Ticket = () => {
     setDrawerOpen(false);
   };
 
+  const handleSearchToggle = () => {
+    setSearchOpen(!searchOpen);
+  };
+
+  const handleMessageFound = (message) => {
+    // Scroll to the found message
+    const messageElement = document.getElementById(`message-${message.id}`);
+    if (messageElement) {
+      messageElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      // Highlight the message temporarily
+      messageElement.classList.add('highlighted-message');
+      setTimeout(() => {
+        messageElement.classList.remove('highlighted-message');
+      }, 3000);
+    }
+  };
+
+  const handleNavigateResult = (message, index) => {
+    handleMessageFound(message);
+  };
+
   const renderTicketInfo = () => {
     if (ticket.user !== undefined) {
       return (
@@ -159,6 +183,7 @@ const Ticket = () => {
           ticket={ticket}
           ticketId={ticket.id}
           isGroup={ticket.isGroup}
+          onMessagesLoad={setMessages}
         ></MessagesList>
         <MessageInput ticketId={ticket.id} ticketStatus={ticket.status} />
       </>
@@ -176,11 +201,18 @@ const Ticket = () => {
       >
         <TicketHeader loading={loading}>
           {renderTicketInfo()}
-          <TicketActionButtons ticket={ticket} />
+          <TicketActionButtons ticket={ticket} onSearchToggle={handleSearchToggle} />
         </TicketHeader>
         <Paper>
           <TagsContainer ticket={ticket} />
         </Paper>
+        <MessageSearch
+          open={searchOpen}
+          onClose={() => setSearchOpen(false)}
+          messages={messages}
+          onMessageFound={handleMessageFound}
+          onNavigateResult={handleNavigateResult}
+        />
         <ReplyMessageProvider>{renderMessagesList()}</ReplyMessageProvider>
       </Paper>
       <ContactDrawer

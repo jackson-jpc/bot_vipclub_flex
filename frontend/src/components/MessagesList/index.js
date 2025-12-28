@@ -18,8 +18,12 @@ import {
   ExpandMore,
   GetApp,
   Reply,
+  KeyboardArrowDown,
+  InsertDriveFile,
+  ArrowDownward,
 } from "@material-ui/icons";
 import AudioModal from "../AudioModal";
+import AudioMessageWhatsApp from "../AudioMessageWhatsApp";
 import MarkdownWrapper from "../MarkdownWrapper";
 import ModalImageCors from "../ModalImageCors";
 import MessageOptionsMenu from "../MessageOptionsMenu";
@@ -262,6 +266,119 @@ const useStyles = makeStyles((theme) => ({
     backgroundColor: theme.mode === 'light' ? '#2DDD7F' : '#1c1c1c',
     color: theme.mode === 'light' ? '#2DDD7F' : '#FFF',
   },
+  documentContainer: {
+    display: "flex",
+    alignItems: "center",
+    padding: "12px 16px",
+    backgroundColor: theme.mode === 'light' ? '#dcf8c6' : '#2a2a2a',
+    borderRadius: "8px",
+    marginBottom: "8px",
+    cursor: "default",
+    "&:hover": {
+      backgroundColor: theme.mode === 'light' ? '#d4f0c0' : '#333333',
+    },
+  },
+  documentContainerReceived: {
+    backgroundColor: theme.mode === 'light' ? '#ffffff' : '#2a2a2a',
+    "&:hover": {
+      backgroundColor: theme.mode === 'light' ? '#f5f5f5' : '#333333',
+    },
+  },
+  documentIcon: {
+    fontSize: 40,
+    color: theme.mode === 'light' ? '#0084ff' : '#4fc3f7',
+    marginRight: 12,
+  },
+  documentInfo: {
+    flex: 1,
+    minWidth: 0,
+  },
+  documentName: {
+    fontSize: "14px",
+    fontWeight: 500,
+    color: theme.mode === 'light' ? '#111b21' : '#e9edef',
+    marginBottom: 4,
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+  },
+  documentMeta: {
+    fontSize: "12px",
+    color: theme.mode === 'light' ? '#667781' : '#8696a0',
+  },
+  documentDownload: {
+    marginLeft: 8,
+    color: theme.mode === 'light' ? '#667781' : '#8696a0',
+    cursor: "pointer",
+    transition: "all 0.3s ease",
+    position: "relative",
+    width: 24,
+    height: 24,
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    "&:hover": {
+      color: theme.mode === 'light' ? '#0084ff' : '#4fc3f7',
+    },
+    "& svg": {
+      transition: "opacity 0.3s ease",
+    },
+  },
+  documentDownloadLoading: {
+    "&::before": {
+      content: '""',
+      position: "absolute",
+      top: "50%",
+      left: "50%",
+      transform: "translate(-50%, -50%)",
+      width: "20px",
+      height: "20px",
+      borderRadius: "50%",
+      border: `2px solid ${theme.mode === 'light' ? '#0084ff' : '#4fc3f7'}`,
+      borderTopColor: "transparent",
+      animation: "$spin 0.8s linear infinite",
+      zIndex: 1,
+    },
+    "& svg": {
+      opacity: 0,
+      visibility: "hidden",
+    },
+  },
+  "@keyframes spin": {
+    "0%": {
+      transform: "rotate(0deg)",
+    },
+    "100%": {
+      transform: "rotate(360deg)",
+    },
+  },
+  scrollToBottomButton: {
+    position: "absolute",
+    bottom: 20,
+    right: 20,
+    backgroundColor: theme.palette.background.paper,
+    color: theme.palette.text.primary,
+    boxShadow: "0 2px 10px rgba(0,0,0,0.2)",
+    zIndex: 1000,
+    transition: "all 0.3s ease",
+    opacity: 1,
+    "&:hover": {
+      backgroundColor: theme.palette.mode === 'light' ? '#f5f5f5' : '#424242',
+      transform: "scale(1.1)",
+      boxShadow: "0 4px 15px rgba(0,0,0,0.3)",
+    },
+    "&:active": {
+      transform: "scale(0.95)",
+    },
+  },
+  scrollToBottomButtonHidden: {
+    opacity: 0,
+    pointerEvents: "none",
+    transform: "scale(0.8)",
+    "&:hover": {
+      opacity: 0, // Garante que não apareça no hover quando escondido
+    },
+  },
 }));
 
 const reducer = (state, action) => {
@@ -317,7 +434,7 @@ const reducer = (state, action) => {
   }
 };
 
-const MessagesList = ({ ticket, ticketId, isGroup }) => {
+const MessagesList = ({ ticket, ticketId, isGroup, onMessagesLoad }) => {
   const classes = useStyles();
   const [messagesList, dispatch] = useReducer(reducer, []);
   const [pageNumber, setPageNumber] = useState(1);
@@ -329,15 +446,25 @@ const MessagesList = ({ ticket, ticketId, isGroup }) => {
   const messageOptionsMenuOpen = Boolean(anchorEl);
   const currentTicketId = useRef(ticketId);
   const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+  const [showScrollToBottom, setShowScrollToBottom] = useState(false);
+  const messagesListRef = useRef();
   const socketManager = useContext(SocketContext);
+  const scrollTimeoutRef = useRef();
   const { setReplyingMessage } = useContext(ReplyMessageContext);
   const { showSelectMessageCheckbox } = useContext(ForwardMessageContext);
+  const [downloadingFiles, setDownloadingFiles] = useState(new Set());
 
   useEffect(() => {
     dispatch({ type: "RESET" });
     setPageNumber(1);
     currentTicketId.current = ticketId;
   }, [ticketId]);
+
+  useEffect(() => {
+    if (onMessagesLoad && messagesList.length > 0) {
+      onMessagesLoad(messagesList);
+    }
+  }, [messagesList, onMessagesLoad]);
 
   useEffect(() => {
     setLoading(true);
@@ -399,11 +526,28 @@ const MessagesList = ({ ticket, ticketId, isGroup }) => {
 
     return () => {
       socket.disconnect();
+      if (scrollTimeoutRef.current) {
+        clearTimeout(scrollTimeoutRef.current);
+      }
     };
   }, [ticketId, ticket, socketManager]);
 
   const loadMore = () => {
-    setPageNumber((prevPageNumber) => prevPageNumber + 1);
+    const messagesContainer = document.getElementById("messagesList");
+    const scrollHeightBefore = messagesContainer?.scrollHeight || 0;
+    
+    setPageNumber((prevPageNumber) => {
+      // Preserva a posição do scroll após carregar novas mensagens
+      setTimeout(() => {
+        if (messagesContainer) {
+          const scrollHeightAfter = messagesContainer.scrollHeight;
+          const scrollDiff = scrollHeightAfter - scrollHeightBefore;
+          messagesContainer.scrollTop += scrollDiff;
+        }
+      }, 100);
+      
+      return prevPageNumber + 1;
+    });
   };
 
   const scrollToBottom = () => {
@@ -413,20 +557,24 @@ const MessagesList = ({ ticket, ticketId, isGroup }) => {
   };
 
   const handleScroll = (e) => {
-    if (!hasMore) return;
-    const { scrollTop } = e.currentTarget;
-
-    if (scrollTop === 0) {
-      document.getElementById("messagesList").scrollTop = 1;
+    const { scrollTop, scrollHeight, clientHeight } = e.currentTarget;
+    
+    // Debounce para evitar múltiplas chamadas
+    if (scrollTimeoutRef.current) {
+      clearTimeout(scrollTimeoutRef.current);
     }
+    
+    scrollTimeoutRef.current = setTimeout(() => {
+      // Lógica para carregar mais mensagens antigas quando rolar para cima
+      if (hasMore && !loading && scrollTop < 100) {
+        console.log("Carregando mais mensagens antigas...", { hasMore, loading, scrollTop });
+        loadMore();
+      }
+    }, 100);
 
-    if (loading) {
-      return;
-    }
-
-    if (scrollTop < 50) {
-      loadMore();
-    }
+    // Lógica para mostrar/esconder botão de scroll to bottom (sem debounce para ser mais responsivo)
+    const isNearBottom = scrollHeight - scrollTop - clientHeight < 100;
+    setShowScrollToBottom(!isNearBottom);
   };
 
   const hanldeReplyMessage = (e, message) => {
@@ -441,6 +589,109 @@ const MessagesList = ({ ticket, ticketId, isGroup }) => {
 
   const handleCloseMessageOptionsMenu = (e) => {
     setAnchorEl(null);
+  };
+
+  const formatFileSize = (bytes) => {
+    if (!bytes) return '';
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(0) + ' KB';
+    return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+  };
+
+  const handleDownloadDocument = async (message, event) => {
+    event.stopPropagation();
+    if (!message.mediaUrl) return;
+
+    const messageId = message.id;
+    setDownloadingFiles(prev => new Set(prev).add(messageId));
+
+    try {
+      // Normalizar URL se necessário
+      let downloadUrl = message.mediaUrl;
+      if (downloadUrl.startsWith('/')) {
+        const baseURL = process.env.REACT_APP_BACKEND_URL || api.defaults.baseURL || 'http://localhost:3000';
+        downloadUrl = `${baseURL}${downloadUrl}`;
+      }
+
+      const response = await fetch(downloadUrl, {
+        method: 'GET',
+        headers: {
+          'Accept': '*/*',
+        },
+      });
+      
+      if (!response.ok) {
+        throw new Error('Erro ao baixar arquivo');
+      }
+
+      const blob = await response.blob();
+      const fileName = getFileName(message);
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = fileName;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Erro ao baixar arquivo:', error);
+      toastError(error);
+    } finally {
+      setTimeout(() => {
+        setDownloadingFiles(prev => {
+          const newSet = new Set(prev);
+          newSet.delete(messageId);
+          return newSet;
+        });
+      }, 500);
+    }
+  };
+
+  const getFileExtension = (filename) => {
+    if (!filename) return '';
+    const parts = filename.split('.');
+    return parts.length > 1 ? parts[parts.length - 1].toUpperCase() : '';
+  };
+
+  const getFileName = (message) => {
+    // Tenta extrair do dataJson primeiro (mensagens do Baileys)
+    if (message.dataJson) {
+      try {
+        const data = JSON.parse(message.dataJson);
+        const docMsg = data?.message?.documentMessage || 
+                      data?.message?.documentWithCaptionMessage?.message?.documentMessage;
+        if (docMsg?.fileName) {
+          return docMsg.fileName;
+        }
+      } catch (e) {
+        // Ignora erro de parsing
+      }
+    }
+    
+    if (message.body) {
+      // Tenta extrair o nome do arquivo do body
+      const lines = message.body.split('\n');
+      for (let line of lines) {
+        if (line.includes('.') && !line.startsWith('http') && !line.match(/^\d+\s*(B|KB|MB|GB)/i)) {
+          return line.trim();
+        }
+      }
+    }
+    // Se não encontrar no body, tenta do mediaUrl
+    if (message.mediaUrl) {
+      const urlParts = message.mediaUrl.split('/');
+      const fileName = urlParts[urlParts.length - 1];
+      if (fileName && fileName.includes('.')) {
+        // Remove timestamp se presente (formato: timestamp_filename.ext)
+        const parts = fileName.split('_');
+        if (parts.length > 1 && /^\d+$/.test(parts[0])) {
+          return parts.slice(1).join('_');
+        }
+        return fileName;
+      }
+    }
+    return 'Documento';
   };
 
   const checkMessageMedia = (message) => {
@@ -475,7 +726,7 @@ const MessagesList = ({ ticket, ticketId, isGroup }) => {
     } else if (message.mediaType === "image") {
       return <ModalImageCors imageUrl={message.mediaUrl} />;
     } else if (message.mediaType === "audio") {
-      return <AudioModal url={message.mediaUrl} />;
+      return <AudioMessageWhatsApp url={message.mediaUrl} contact={!message.fromMe ? message.contact : null} fromMe={message.fromMe} />;
     } else if (message.mediaType === "video") {
       return (
         <video
@@ -483,6 +734,54 @@ const MessagesList = ({ ticket, ticketId, isGroup }) => {
           src={message.mediaUrl}
           controls
         />
+      );
+    } else if (message.mediaType === "document" || message.mediaType === "application" || message.mediaType === "documentMessage" || message.mediaType === "documentWithCaptionMessage") {
+      const fileName = getFileName(message);
+      const fileExt = getFileExtension(fileName);
+      
+      // Tenta obter tamanho do arquivo do dataJson
+      let fileSize = '';
+      if (message.dataJson) {
+        try {
+          const data = JSON.parse(message.dataJson);
+          const docMsg = data?.message?.documentMessage || 
+                        data?.message?.documentWithCaptionMessage?.message?.documentMessage;
+          if (docMsg?.fileLength) {
+            fileSize = formatFileSize(docMsg.fileLength);
+          }
+        } catch (e) {
+          // Ignora erro de parsing
+        }
+      }
+      
+      // Se não encontrou no dataJson, tenta do body
+      if (!fileSize && message.body) {
+        const fileSizeMatch = message.body?.match(/(\d+)\s*(B|KB|MB|GB)/i);
+        fileSize = fileSizeMatch ? fileSizeMatch[0] : '';
+      }
+      
+      const isDownloading = downloadingFiles.has(message.id);
+      
+      return (
+        <div 
+          className={`${classes.documentContainer} ${!message.fromMe ? classes.documentContainerReceived : ''}`}
+        >
+          <InsertDriveFile className={classes.documentIcon} />
+          <div className={classes.documentInfo}>
+            <div className={classes.documentName}>
+              {fileName.length > 50 ? fileName.substring(0, 50) + '...' : fileName}
+            </div>
+            <div className={classes.documentMeta}>
+              {fileExt ? `${fileExt} • ` : ''}{fileSize || 'Arquivo'}
+            </div>
+          </div>
+          <div 
+            className={`${classes.documentDownload} ${isDownloading ? classes.documentDownloadLoading : ''}`}
+            onClick={(e) => handleDownloadDocument(message, e)}
+          >
+            <ArrowDownward style={{ fontSize: 20 }} />
+          </div>
+        </div>
       );
     } else {
       return (
@@ -712,6 +1011,7 @@ const MessagesList = ({ ticket, ticketId, isGroup }) => {
               {renderNumberTicket(message, index)}
               {renderMessageDivider(message, index)}
               <div
+                id={`message-${message.id}`}
                 className={classes.messageLeft}
                 title={message.queueId && message.queue?.name}
                 onDoubleClick={(e) => hanldeReplyMessage(e, message)}
@@ -721,6 +1021,7 @@ const MessagesList = ({ ticket, ticketId, isGroup }) => {
                     message={message}
                   />
                 )}
+                
                 <IconButton
                   variant="contained"
                   size="small"
@@ -758,13 +1059,13 @@ const MessagesList = ({ ticket, ticketId, isGroup }) => {
                   </div>
                 )}
 
-                {(message.mediaUrl || message.mediaType === "locationMessage" || message.mediaType === "vcard" || message.mediaType === "contactMessage"
+                {(message.mediaUrl || message.mediaType === "locationMessage" || message.mediaType === "vcard" || message.mediaType === "contactMessage" || message.mediaType === "document" || message.mediaType === "application" || message.mediaType === "documentMessage" || message.mediaType === "documentWithCaptionMessage"
                 ) && checkMessageMedia(message)}
                 <div className={message.isEdited ? classes.textContentItemEdited : classes.textContentItem}>
                   {message.quotedMsg && renderQuotedMessage(message)}
-                  {message.mediaType !== "reactionMessage" && (
+                  {message.mediaType !== "reactionMessage" && message.mediaType !== "audio" && message.mediaType !== "document" && message.mediaType !== "application" && message.mediaType !== "documentMessage" && message.mediaType !== "documentWithCaptionMessage" && (
                     <MarkdownWrapper>
-                      {message.mediaType === "locationMessage" || message.mediaType === "contactMessage" 
+                      {message.mediaType === "locationMessage" || message.mediaType === "contactMessage"
                         ? null
                         : message.body}
                     </MarkdownWrapper>
@@ -792,14 +1093,17 @@ const MessagesList = ({ ticket, ticketId, isGroup }) => {
               {renderDailyTimestamps(message, index)}
               {renderNumberTicket(message, index)}
               {renderMessageDivider(message, index)}
-              <div className={classes.messageRight}
-              onDoubleClick={(e) => hanldeReplyMessage(e, message)}
-            >
+              <div 
+                id={`message-${message.id}`}
+                className={classes.messageRight}
+                onDoubleClick={(e) => hanldeReplyMessage(e, message)}
+              >
               {showSelectMessageCheckbox && (
                 <SelectMessageCheckbox
                   message={message}
                 />
               )}
+              
                 <IconButton
                   variant="contained"
                   size="small"
@@ -818,7 +1122,7 @@ const MessagesList = ({ ticket, ticketId, isGroup }) => {
                     <br />
                   </div>
                 )}
-                {(message.mediaUrl || message.mediaType === "locationMessage" || message.mediaType === "vcard" || message.mediaType === "contactMessage"
+                {(message.mediaUrl || message.mediaType === "locationMessage" || message.mediaType === "vcard" || message.mediaType === "contactMessage" || message.mediaType === "document" || message.mediaType === "application" || message.mediaType === "documentMessage" || message.mediaType === "documentWithCaptionMessage"
                 ) && checkMessageMedia(message)}
                 <div
                   className={clsx({
@@ -835,7 +1139,7 @@ const MessagesList = ({ ticket, ticketId, isGroup }) => {
                     />
                   )}
                   {message.quotedMsg && renderQuotedMessage(message)}
-                  {message.mediaType !== "reactionMessage" && message.mediaType !== "locationMessage" && (
+                  {message.mediaType !== "reactionMessage" && message.mediaType !== "locationMessage" && message.mediaType !== "contactMessage" && message.mediaType !== "audio" && message.mediaType !== "document" && message.mediaType !== "application" && message.mediaType !== "documentMessage" && message.mediaType !== "documentWithCaptionMessage" && (
                     <MarkdownWrapper>{message.body}</MarkdownWrapper>
                   )}
                   {message.quotedMsg && message.mediaType === "reactionMessage" && (
@@ -876,6 +1180,7 @@ const MessagesList = ({ ticket, ticketId, isGroup }) => {
         id="messagesList"
         className={classes.messagesList}
         onScroll={handleScroll}
+        ref={messagesListRef}
       >
         {messagesList.length > 0 ? renderMessages() : []}
       </div>
@@ -884,6 +1189,17 @@ const MessagesList = ({ ticket, ticketId, isGroup }) => {
           <CircularProgress className={classes.circleLoading} />
         </div>
       )}
+      
+      {/* Botão de scroll para última mensagem */}
+      <IconButton
+        className={clsx(classes.scrollToBottomButton, {
+          [classes.scrollToBottomButtonHidden]: !showScrollToBottom
+        })}
+        onClick={scrollToBottom}
+        title="Ir para última mensagem"
+      >
+        <KeyboardArrowDown />
+      </IconButton>
     </div>
   );
 };

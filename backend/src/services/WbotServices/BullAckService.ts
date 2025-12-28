@@ -1,5 +1,5 @@
 import Bull from 'bull';
-import { WAMessage, WAMessageUpdate } from '@whiskeysockets/baileys';
+import { WAMessage, WAMessageUpdate } from 'baileys';
 import { handleMsgAck } from './wbotMessageListener';
 import configLoader from '../ConfigLoaderService/configLoaderService';
 

@@ -3,7 +3,7 @@ import { useHistory } from "react-router-dom";
 
 import { makeStyles, createTheme, ThemeProvider } from "@material-ui/core/styles";
 import { IconButton } from "@material-ui/core";
-import { MoreVert, Replay } from "@material-ui/icons";
+import { MoreVert, Replay, Search } from "@material-ui/icons";
 
 import { i18n } from "../../translate/i18n";
 import api from "../../services/api";
@@ -16,6 +16,7 @@ import CheckCircleIcon from '@material-ui/icons/CheckCircle';
 import UndoRoundedIcon from '@material-ui/icons/UndoRounded';
 import Tooltip from '@material-ui/core/Tooltip';
 import { green } from '@material-ui/core/colors';
+import TicketAlreadyOpenModal from "../TicketAlreadyOpenModal";
 
 
 const useStyles = makeStyles(theme => ({
@@ -30,11 +31,13 @@ const useStyles = makeStyles(theme => ({
 	},
 }));
 
-const TicketActionButtonsCustom = ({ ticket }) => {
+const TicketActionButtonsCustom = ({ ticket, onSearchToggle }) => {
 	const classes = useStyles();
 	const history = useHistory();
 	const [anchorEl, setAnchorEl] = useState(null);
 	const [loading, setLoading] = useState(false);
+	const [showAlreadyOpenModal, setShowAlreadyOpenModal] = useState(false);
+	const [attendingUserName, setAttendingUserName] = useState("");
 	const ticketOptionsMenuOpen = Boolean(anchorEl);
 	const { user } = useContext(AuthContext);
 	const { setCurrentTicket } = useContext(TicketsContext);
@@ -73,11 +76,24 @@ const TicketActionButtonsCustom = ({ ticket }) => {
 			}
 		} catch (err) {
 			setLoading(false);
-			toastError(err);
+			// Verificar se é erro de ticket já aberto
+			const errorMessage = err?.response?.data?.error || err?.message || "";
+			if (errorMessage.includes("TICKET_ALREADY_OPEN")) {
+				const parts = errorMessage.split("|");
+				if (parts.length >= 2) {
+					setAttendingUserName(parts[1] || "Atendente");
+					setShowAlreadyOpenModal(true);
+				} else {
+					toastError("Este ticket já está sendo atendido por outro atendente.");
+				}
+			} else {
+				toastError(err);
+			}
 		}
 	};
 
 	return (
+		<>
 		<div className={classes.actionButtons}>
 			{ticket.status === "closed" && (
 				<ButtonWithSpinner
@@ -91,6 +107,11 @@ const TicketActionButtonsCustom = ({ ticket }) => {
 			)}
 			{ticket.status === "open" && (
 				<>
+					<Tooltip title={i18n.t("messageSearch.searchButton")}>
+						<IconButton onClick={onSearchToggle}>
+							<Search />
+						</IconButton>
+					</Tooltip>
 					<Tooltip title={i18n.t("messagesList.header.buttons.return")}>
 						<IconButton onClick={e => handleUpdateTicketStatus(e, "pending", null)}>
 							<UndoRoundedIcon />
@@ -143,6 +164,12 @@ const TicketActionButtonsCustom = ({ ticket }) => {
 				</ButtonWithSpinner>
 			)}
 		</div>
+		<TicketAlreadyOpenModal
+			open={showAlreadyOpenModal}
+			onClose={() => setShowAlreadyOpenModal(false)}
+			attendingUserName={attendingUserName}
+		/>
+		</>
 	);
 };
 

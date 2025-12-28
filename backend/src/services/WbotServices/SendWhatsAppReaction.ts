@@ -1,5 +1,5 @@
-import { WAMessage } from "@whiskeysockets/baileys";
-import WALegacySocket from "@whiskeysockets/baileys";
+import { WAMessage } from "baileys";
+import WALegacySocket from "baileys";
 import * as Sentry from "@sentry/node";
 import AppError from "../../errors/AppError";
 import GetTicketWbot from "../../helpers/GetTicketWbot";
@@ -9,6 +9,7 @@ import SendWhatsAppMessage from "./SendWhatsAppMessage";
 import formatBody from "../../helpers/Mustache";
 import {getBodyMessage} from "./wbotMessageListener";
 import CreateMessageService from "../MessageServices/CreateMessageService";
+import { buildContactAddress } from "../../utils/global";
 
 interface ReactionRequest {
   messageId: string;
@@ -23,8 +24,8 @@ const SendWhatsAppReaction = async ({
 }: ReactionRequest): Promise<WAMessage> => {
   const wbot = await GetTicketWbot(ticket);
 
-  const number = `${ticket.contact.number}@${ticket.isGroup ? "g.us" : "s.whatsapp.net"}`;
-
+  // const number = `${ticket.contact.number}@${ticket.isGroup ? "g.us" : "s.whatsapp.net"}`;
+  const number = buildContactAddress(ticket.contact, ticket.isGroup);
   try {
     const messageToReact = await Message.findOne({
       where: {

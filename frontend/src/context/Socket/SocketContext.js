@@ -114,8 +114,10 @@ const SocketManager = {
 
       this.currentCompanyId = companyId;
       this.currentUserId = userId;
+      const backendUrl = process.env.REACT_APP_BACKEND_URL
+      console.log("backendUrl", backendUrl || 'ndaaaa');
       
-      this.currentSocket = openSocket(process.env.REACT_APP_BACKEND_URL, {
+      this.currentSocket = openSocket(backendUrl, {
         transports: ["websocket"],
         pingTimeout: 18000,
         pingInterval: 18000,

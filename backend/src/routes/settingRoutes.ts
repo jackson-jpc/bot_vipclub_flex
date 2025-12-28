@@ -2,9 +2,12 @@ import { Router } from "express";
 import isAuth from "../middleware/isAuth";
 
 import * as SettingController from "../controllers/SettingController";
+import { testBirthdayReminder } from "../controllers/BirthdayReminderController";
 import multer from "multer";
 import uploadConfig from "../config/uploadlogo";
+import uploadGerencianetCertConfig from "../config/uploadGerencianetCert";
 const upload = multer(uploadConfig);
+const uploadGerencianetCert = multer(uploadGerencianetCertConfig);
 
 const settingRoutes = Router();
 
@@ -20,5 +23,14 @@ settingRoutes.post(
   upload.array("file"),
   SettingController.mediaUpload
 );
+
+settingRoutes.post(
+  "/settings/gerencianet-cert-upload",
+  isAuth,
+  uploadGerencianetCert.single("file"),
+  SettingController.gerencianetCertUpload
+);
+
+settingRoutes.get("/settings/test-birthday-reminder", isAuth, testBirthdayReminder);
 
 export default settingRoutes;

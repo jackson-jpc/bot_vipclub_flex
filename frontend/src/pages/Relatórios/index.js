@@ -407,27 +407,13 @@ const Relatorios = () => {
             {/* <Grid item xs={12} md={4} xl={4}>
               <TagsFilter onFiltered={handleSelectedTags} />
             </Grid> */}
-            <Grid item xs={12} md={3} xl={3} style={{ marginTop: '-13px' }}>
+            <Grid item xs={12} md={4} xl={4} style={{ marginTop: '-13px' }}>
               <QueueSelectCustom
                 selectedQueueIds={queueIds}
                 onChange={values => setQueueIds(values)}
               />
             </Grid>
-
-            <Grid item xs={12} sm={3} md={3}>
-              <TextField
-                label="Ticket ID"
-                type="text"
-                value={ticketId}
-                variant="outlined"
-                fullWidth
-                size="small"
-                onChange={(e)=>{
-                  setTicketId(e.target.value)
-                }}
-              />
-            </Grid>
-            <Grid item xs={12} sm={3} md={3}>
+            <Grid item xs={12} sm={4} md={4}>
               <TextField
                 label="Data Inicial"
                 type="date"
@@ -441,7 +427,7 @@ const Relatorios = () => {
                 }}
               />
             </Grid>
-            <Grid item xs={12} sm={3} md={3}>
+            <Grid item xs={12} sm={4} md={4}>
               <TextField
                 label="Data Final"
                 type="date"

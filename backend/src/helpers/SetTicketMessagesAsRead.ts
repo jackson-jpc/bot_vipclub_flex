@@ -1,4 +1,4 @@
-import { proto, WASocket } from "@whiskeysockets/baileys";
+import { proto, WASocket } from "baileys";
 // import cacheLayer from "../libs/cache";
 import { getIO } from "../libs/socket";
 import Message from "../models/Message";
@@ -28,8 +28,10 @@ const SetTicketMessagesAsRead = async (ticket: Ticket): Promise<void> => {
       );
 
       if (lastMessages.key && lastMessages.key.fromMe === false) {
+        // Type assertion para garantir compatibilidade com MinimalMessage
+        const messageToMark = lastMessages as proto.IWebMessageInfo & { key: proto.IMessageKey };
         await (wbot as WASocket).chatModify(
-          { markRead: true, lastMessages: [lastMessages] },
+          { markRead: true, lastMessages: [messageToMark] },
           `${ticket.contact.number}@${
             ticket.isGroup ? "g.us" : "s.whatsapp.net"
           }`

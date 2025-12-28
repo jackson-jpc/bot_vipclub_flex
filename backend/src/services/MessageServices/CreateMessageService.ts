@@ -25,7 +25,14 @@ const CreateMessageService = async ({
   messageData,
   companyId
 }: Request): Promise<Message> => {
-  await Message.upsert({ ...messageData, companyId });
+  // Garantir que ack sempre tenha um valor numérico
+  const messageDataWithDefaults = {
+    ...messageData,
+    ack: messageData.ack ?? 0,
+    companyId
+  };
+  
+  await Message.upsert(messageDataWithDefaults);
 
   const message = await Message.findByPk(messageData.id, {
     include: [

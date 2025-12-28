@@ -38,7 +38,7 @@ import ColorModeContext from "../layout/themeContext";
 import Brightness4Icon from '@material-ui/icons/Brightness4';
 import Brightness7Icon from '@material-ui/icons/Brightness7';
 
-const drawerWidth = 240;
+const drawerWidth = 310;
 
 const useStyles = makeStyles((theme) => ({
   root: {
@@ -173,23 +173,35 @@ const LoggedInLayout = ({ children }) => {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [drawerVariant, setDrawerVariant] = useState("permanent");
   const { user } = useContext(AuthContext);
+  const companyId = user?.companyId;
 
   const theme = useTheme();
   const { colorMode } = useContext(ColorModeContext);
   const greaterThenSm = useMediaQuery(theme.breakpoints.up("sm"));
 
-  // Definindo os logos para modo claro e escuro
-  const logoLight = `${process.env.REACT_APP_BACKEND_URL}/public/logotipos/interno.png`;
-  const logoDark = `${process.env.REACT_APP_BACKEND_URL}/public/logotipos/logo_w.png`;
+  // Default logos based on theme
+  const defaultLogoLight = `${process.env.REACT_APP_BACKEND_URL}/public/logotipos/interno.png`;
+  const defaultLogoDark = `${process.env.REACT_APP_BACKEND_URL}/public/logotipos/logo_w.png`;
 
-  // Definindo o logo inicial com base no modo de tema atual
-  const initialLogo = theme.palette.type === 'light' ? logoLight : logoDark;
-  const [logoImg, setLogoImg] = useState(initialLogo);
+  // Potential custom logo base URL (will try .png, .jpg, .svg)
+  const customLogoBaseUrl = companyId ? `${process.env.REACT_APP_BACKEND_URL}/public/company${companyId}/logotipos/logo` : null;
+
+  // State for the final logo URL to display
+  const [finalLogoUrl, setFinalLogoUrl] = useState('');
 
   const [volume, setVolume] = useState(localStorage.getItem("volume") || 1);
   const { dateToClient } = useDate();
 
   const socketManager = useContext(SocketContext);
+
+  // Determine the correct logo URL to attempt loading initially and on theme/company change
+  useEffect(() => {
+    const themeDefaultLogo = theme.palette.type === 'light' ? defaultLogoLight : defaultLogoDark;
+    // Prioritize custom logo if companyId exists, try .png first
+    const potentialCustomUrl = customLogoBaseUrl ? `${customLogoBaseUrl}.png` : themeDefaultLogo;
+    setFinalLogoUrl(potentialCustomUrl); // Set the initial URL to try
+
+  }, [theme.palette.type, companyId, customLogoBaseUrl, defaultLogoLight, defaultLogoDark]);
 
   useEffect(() => {
     if (document.body.offsetWidth > 1200) {
@@ -206,12 +218,12 @@ const LoggedInLayout = ({ children }) => {
   }, [drawerOpen]);
 
   useEffect(() => {
-    const companyId = localStorage.getItem("companyId");
+    const storedCompanyId = localStorage.getItem("companyId");
     const userId = localStorage.getItem("userId");
 
-    const socket = socketManager.getSocket(companyId);
+    const socket = socketManager.getSocket(storedCompanyId);
 
-    socket.on(`company-${companyId}-auth`, (data) => {
+    socket.on(`company-${storedCompanyId}-auth`, (data) => {
       if (data.user.id === +userId) {
         toastError("Sua conta foi acessada em outro computador.");
         setTimeout(() => {
@@ -265,13 +277,41 @@ const LoggedInLayout = ({ children }) => {
     }
   };
 
-  useEffect(() => {
-    setLogoImg(theme.palette.type === 'light' ? logoLight : logoDark);
-  }, [theme.palette.type]);
-
   const toggleColorMode = () => {
     colorMode.toggleColorMode();
-    setLogoImg((prevLogo) => (prevLogo === logoLight ? logoDark : logoLight));
+    // Logo update is handled by useEffect watching theme.palette.type
+  };
+
+  // Fallback logic for image loading errors
+  const handleLogoError = (event) => {
+    const currentSrc = event.target.src.split('?')[0]; // Get URL without cache buster
+    const themeDefaultLogo = theme.palette.type === 'light' ? defaultLogoLight : defaultLogoDark;
+
+    // If the current source is already the default, stop to prevent loops
+    if (currentSrc === themeDefaultLogo) {
+        console.error("Default logo also failed to load:", currentSrc);
+        return;
+    }
+
+    // If trying custom .png failed, try custom .jpg
+    if (customLogoBaseUrl && currentSrc === `${customLogoBaseUrl}.png`) {
+        console.log("Custom logo.png failed, trying logo.jpg");
+        setFinalLogoUrl(`${customLogoBaseUrl}.jpg`);
+        return; // Try loading jpg
+    }
+
+    // If trying custom .jpg failed, try custom .svg
+    if (customLogoBaseUrl && currentSrc === `${customLogoBaseUrl}.jpg`) {
+        console.log("Custom logo.jpg failed, trying logo.svg");
+        setFinalLogoUrl(`${customLogoBaseUrl}.svg`);
+        return; // Try loading svg
+    }
+
+    // If trying custom .svg failed (or if no custom base URL, or if any other error occurred), fall back to the theme default logo
+    if (currentSrc !== themeDefaultLogo) {
+        console.log("Custom logo failed or not found, falling back to default:", themeDefaultLogo);
+        setFinalLogoUrl(themeDefaultLogo);
+    }
   };
 
   if (loading) {
@@ -292,7 +332,16 @@ const LoggedInLayout = ({ children }) => {
         open={drawerOpen}
       >
         <div className={classes.toolbarIcon}>
-          <img src={`${logoImg}?r=${Math.random()}`} style={{ margin: "0 auto" , width: "50%"}} alt={`${process.env.REACT_APP_NAME_SYSTEM}`} />
+          {/* Logo Display with Fallback */}
+          {finalLogoUrl && (
+            <img
+              key={finalLogoUrl} // Add key to force re-render on URL change
+              src={`${finalLogoUrl}?r=${Math.random()}`} // Use state variable
+              style={{ margin: "0 auto", width: "50%" }}
+              alt={`${process.env.REACT_APP_NAME_SYSTEM} Logo`}
+              onError={handleLogoError} // Add onError handler
+            />
+          )}
           <IconButton onClick={() => setDrawerOpen(!drawerOpen)}>
             <ChevronLeftIcon />
           </IconButton>
@@ -387,8 +436,11 @@ const LoggedInLayout = ({ children }) => {
               <MenuItem onClick={handleOpenUserModal}>
                 {i18n.t("mainDrawer.appBar.user.profile")}
               </MenuItem>
+              <MenuItem onClick={handleClickLogout}> {/* Adicionado onClick para Logout */}
+                {i18n.t("mainDrawer.appBar.user.logout")}
+              </MenuItem>
               <MenuItem onClick={toggleColorMode}>
-                {theme.mode === 'dark' ? (
+                {theme.palette.type === 'dark' ? (
                   <>
                     <Brightness7Icon style={{ marginRight: 8 }} /> Modo Claro
                   </>

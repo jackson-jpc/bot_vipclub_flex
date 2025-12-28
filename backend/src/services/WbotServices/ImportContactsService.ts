@@ -1,73 +1,92 @@
+import * as Sentry from "@sentry/node";
 import GetDefaultWhatsApp from "../../helpers/GetDefaultWhatsApp";
 import { getWbot } from "../../libs/wbot";
 import Contact from "../../models/Contact";
 import { logger } from "../../utils/logger";
 import ShowBaileysService from "../BaileysServices/ShowBaileysService";
 import CreateContactService from "../ContactServices/CreateContactService";
-import AppError from "../../errors/AppError";
+import { isString, isArray } from "lodash";
+import path from "path";
+import fs from 'fs';
+import { promisify } from 'util';
+
+const writeFileAsync = promisify(fs.writeFile);
+const mkdirAsync = promisify(fs.mkdir);
 
 const ImportContactsService = async (companyId: number): Promise<void> => {
   const defaultWhatsapp = await GetDefaultWhatsApp(companyId);
   const wbot = getWbot(defaultWhatsapp.id);
 
-  const baileys = await ShowBaileysService(wbot.id);
-
-  let phoneContactsList = null;
+  let phoneContacts;
 
   try {
-    phoneContactsList = baileys.contacts && JSON.parse(baileys.contacts);
-  } catch (error) {
-    logger.warn(
-      { baileys },
-      `Could not get whatsapp contacts from database. Err: ${error}`
-    );
-    throw new AppError("Could not get whatsapp contacts from database.", 500);
+    const contactsString = await ShowBaileysService(wbot.id);
+    phoneContacts = JSON.parse(JSON.stringify(contactsString.contacts));
+
+    const publicFolder = path.resolve(__dirname, "..", "..", "..", "public");
+    const companyFolder = path.join(publicFolder, `company${companyId}`);
+    
+    // Create company folder if it doesn't exist
+    try {
+      await mkdirAsync(companyFolder, { recursive: true });
+    } catch (err) {
+      logger.error(`Failed to create company folder: ${err}`);
+      throw err;
+    }
+
+    const beforeFilePath = path.join(companyFolder, 'contatos_antes.txt');
+    await writeFileAsync(beforeFilePath, JSON.stringify(phoneContacts, null, 2));
+    console.log(`O arquivo contatos_antes.txt foi criado na pasta company${companyId}!`);
+
+  } catch (err) {
+    Sentry.captureException(err);
+    logger.error(`Could not get whatsapp contacts from phone. Err: ${err}`);
   }
 
-  if (Array.isArray(phoneContactsList)) {
-    const processContacts = async contactsList => {
-      contactsList.forEach(async ({ id, name, notify }) => {
-        if (id === "status@broadcast" || id.includes("g.us")) return;
-        const number = id.replace(/\D/g, "");
+  const publicFolder = path.resolve(__dirname, "..", "..", "..", "public");
+  const companyFolder = path.join(publicFolder, `company${companyId}`);
+  const afterFilePath = path.join(companyFolder, 'contatos_depois.txt');
+  
+  try {
+    await writeFileAsync(afterFilePath, JSON.stringify(phoneContacts, null, 2));
+  } catch (err) {
+    logger.error(`Failed to write contacts to file: ${err}`);
+    throw err;
+  }
 
-        const existingContact = await Contact.findOne({
-          where: { number, companyId }
-        });
+  const phoneContactsList = isString(phoneContacts)
+    ? JSON.parse(phoneContacts)
+    : phoneContacts;
 
-        if (existingContact) {
-          // Atualiza o nome do contato existente
-          existingContact.name = name || notify || number;
-          await existingContact.save();
-        } else {
-          // Criar um novo contato
-          try {
-            await CreateContactService({
-              number,
-              name: name || notify || number,
-              companyId
-            });
-          } catch (error) {
-            logger.error(
-              { name, number, companyId },
-              `Could not save contact. Err: ${error}`
-            );
-          }
-        }
+  if (isArray(phoneContactsList)) {
+    phoneContactsList.forEach(async ({ id, name, notify }) => {
+      if (id === "status@broadcast" || id.includes("g.us")) return;
+      const number = id.replace(/\D/g, "").slice(0, 13);
+
+      const existingContact = await Contact.findOne({
+        where: { number, companyId }
       });
-    };
 
-    processContacts(phoneContactsList).then(
-      () => {
-        logger.debug(
-          `Contacts imported successfully from WhatsApp for company ID: ${companyId}`
-        );
-      },
-      error => {
-        logger.error(
-          `Error importing contacts from WhatsApp for company ID: ${companyId} - ${error.message}`
-        );
+      if (existingContact) {
+        // Atualiza o nome do contato existente
+        existingContact.name = name || notify;
+        await existingContact.save();
+      } else {
+        // Criar um novo contato
+        try {
+          await CreateContactService({
+            number,
+            name: name || notify,
+            companyId
+          });
+        } catch (error) {
+          Sentry.captureException(error);
+          logger.warn(
+            `Could not get whatsapp contacts from phone. Err: ${error}`
+          );
+        }
       }
-    );
+    });
   }
 };
 
